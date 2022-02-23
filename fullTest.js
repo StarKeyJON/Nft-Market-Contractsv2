@@ -24,8 +24,10 @@ describe("MarketPlace Proxy Contract Deployment", function() {
     await ownerProxy.deployed();
     const ownerProxyAddress = ownerProxy.address;
     console.log("Market Owner Proxy address is: " + ownerProxyAddress);
-
+    
     await roleProvider.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", ownerProxyAddress);
+    await roleProvider.grantRole("0x77d72916e966418e6dc58a19999ae9934bef3f749f1547cde0a86e809f19c89b", ownerProxyAddress);
+    await roleProvider.grantRole("0x364d3d7565c7a8300c96fd53e065d19b65848d7b23b3191adcd55621c744223c", ownerProxyAddress);
     await roleProvider.revokeRole("0x0000000000000000000000000000000000000000000000000000000000000000","0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
 
     const NFTMarket = await ethers.getContractFactory("NFTMarket");

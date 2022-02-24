@@ -64,14 +64,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 Interface declarations for upgradable contracts accessibility
 <~~~*/
 interface Marketplace {
-  function setControlAdd(address _contAdd) external;
-  function setCollAdd(address _coll) external;
-  function setBidAdd(address _bid) external;
-  function setOffersAdd(address _offer) external;
-  function setTradesAdd(address _trade) external;
-  function setMarketMintAdd(address _treas) external;
-  function setRwdsAdd(address _rwds) external;
-  function setMrktNFTAdd(address _mrktNft) external;
   function setRoleAdd(address _role) external;
   function setFee(uint _fee) external;
 }
@@ -80,15 +72,7 @@ interface NFT {
   function revokeRole(bytes32 role, address account) external;
 }
 interface Offers {
-  function setControlAdd(address _contAdd) external;
-  function setMrktAdd(address _newAdd) external;
-  function setMrktNFTAdd(address _mrktNft) external;
-  function setMarketMintAdd(address _newAdd) external;
-  function setRwdsAdd(address _rwdsAdd) external;
   function setRoleAdd(address _role) external;
-  function setCollAdd(address _coll) external;
-  function setBidAdd(address _bid) external;
-  function setTradesAdd(address _trade) external;
   function setFee(uint _fee) external;
 }
 interface Collections {
@@ -97,79 +81,97 @@ interface Collections {
   function restrictMarketCollection(string[] calldata name, address[] calldata nftContract) external;
   function editMarketCollection(bool[] calldata isNotTradable, string[] calldata name,address[] calldata nftContract, uint[] calldata collectionId) external;
 }
-interface Trades {
-  function setControlAdd(address _contAdd) external;
-  function setMrktAdd(address _newAdd) external;
-  function setMarketMintAdd(address _newAdd) external;
-  function setCollAdd(address _coll) external;
-  function setRoleAdd(address _role) external;
-  function setOffersAdd(address _offer) external;
-  function setBidAdd(address _bid) external;
-  function setTradesAdd(address _trade) external;
-}
 interface Bids {
-  function setControlAdd(address _contAdd) external;
-  function setMrktAdd(address _mktAdd) external;
-  function setMarketMintAdd(address _mintAdd) external;
-  function setRwdsAdd(address _rwds) external;
-  function setMrktNFTAdd(address _mrktNft) external;
   function setRoleAdd(address _role) external;
-  function setOffersAdd(address _offer) external;
-  function setCollAdd(address _coll) external;
-  function setBidAdd(address _bid) external;
-  function setTradesAdd(address _trade) external;
   function setFee(uint _fee) external;
 }
 interface NFTFactory {
-  function setControlAdd(address _contAdd) external;
   function setRoleAdd(address _role) external;
 }
 interface MarketMint {
-  function setControlAdd(address _contAdd) external;
   function setFee(uint _feeMul) external;
   function setDeployAmnt(uint _deplyAmnt) external;
-  function setMrktNFTAdd(address _nft) external;
-  function setRwdsAdd(address _rewards) external;
-  function setTokenAdd(address _toke) external;
   function setRoleAdd(address _role) external;
-  function setNFTFactoryAdd(address _nftFactory) external;
-  function setNFT1155FactoryAdd(address _nftFactory) external;
   function setNewRedemption(uint amount, address _toke) external;
   function setRedemptionToken(uint64 _redeemAmount, address _contract) external;
 }
 interface RoleProvider {
-  function setControlAdd(address _contAdd) external;
+  function fetchAddress(bytes32 _var) external returns(address);
+  function setMarketAdd(address _mrktAdd) external returns(bool);
+  function setMarketMintAdd(address _mintAdd) external returns(bool);
+  function setNftAdd(address _nftAdd) external returns(bool);
+  function setCollectionsAdd(address _collAdd) external returns(bool);
+  function setOffersAdd(address _offAdd) external returns(bool);
+  function setTradesAdd(address _tradAdd) external returns(bool);
+  function setBidsAdd(address _bidsAdd) external returns(bool);
+  function setRwdsAdd(address _rwdsAdd) external returns(bool);
+  function setRoleAdd(address _role) external returns(bool);
+  function setOwnerProxyAdd(address _proxyAdd) external returns(bool);
+  function setFactoryAdd(address _erc721) external returns(bool);
+  function set1155FactoryAdd(address _erc1155) external returns(bool);
+  function setPhunkyAdd(address _phunky) external returns(bool);
   function hasTheRole(bytes32 role, address _address) external returns(bool);
   function grantRole(bytes32 role, address _address) external;
   function revokeRole(bytes32 role, address account) external;
 }
 interface Rewards {
-  function setControlAdd(address _contAdd) external;
+  function setRoleAdd(address _role) external;
   function setAccountRcv(address _recvr) external;
 }
 
 contract OwnerProxy is ReentrancyGuard {
   /*~~~>
-    State Addres Variables
+    State Address Variables
   <~~~*/
-  address public marketplaceAdd;
-  address public nftAdd;
-  address public marketMintAdd;
-  address public collectionsAdd;
-  address public offersAdd;
-  address public tradesAdd;
-  address public bidsAdd;
-  address public rewardsAdd;
+  //*~~~> global address variable from Role Provider contract
+  bytes32 public constant REWARDS = keccak256("REWARDS");
+  address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+
+  bytes32 public constant COLLECTION = keccak256("COLLECTION");
+  address collectionsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+  
+  bytes32 public constant BIDS = keccak256("BIDS");
+  address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+  
+  bytes32 public constant OFFERS = keccak256("OFFERS");
+  address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+  
+  bytes32 public constant TRADES = keccak256("TRADES");
+  address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
+
+  bytes32 public constant NFTADD = keccak256("NFT");
+  address nftAdd = RoleProvider(roleAdd).fetchAddress(NFTADD);
+
+  bytes32 public constant MINT = keccak256("MINT");
+  address marketMintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
+
+  bytes32 public constant MARKET = keccak256("MARKET");
+  address marketPlaceAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+
+  bytes32 public constant PROXY = keccak256("PROXY");
+  address controlAdd = RoleProvider(roleAdd).fetchAddress(PROXY);
+
+  bytes32 public constant ERC721FACTORY = keccak256("ERC721FACTORY");
+  address erc721FactoryAdd = RoleProvider(roleAdd).fetchAddress(ERC721FACTORY);
+
+  bytes32 public constant ERC1155FACTORY = keccak256("ERC1155FACTORY");
+  address erc1155FactoryAdd = RoleProvider(roleAdd).fetchAddress(ERC1155FACTORY);
+
+  bytes32 public constant DEV = keccak256("DEV");
+  address devAdd = RoleProvider(roleAdd).fetchAddress(DEV);
+
+
   address public roleAdd;
-  address public controlAdd;
-  address public erc721FactoryAdd;
-  address public erc1155FactoryAdd;
 
   //*~~~> Roles for designated accessibility
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
-  
+  bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE");
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
+    _;
+  }
+  modifier hasDevAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), "DOES NOT HAVE DEV ROLE");
     _;
   }
 
@@ -184,7 +186,7 @@ contract OwnerProxy is ReentrancyGuard {
     Offers(offersAdd).setFee(_fee);
     Bids(bidsAdd).setFee(_fee);
     MarketMint(marketMintAdd).setFee(_fee);
-    Marketplace(marketplaceAdd).setFee(_fee);
+    Marketplace(marketPlaceAdd).setFee(_fee);
     return true;
   }
 
@@ -193,7 +195,7 @@ contract OwnerProxy is ReentrancyGuard {
     For setting the state address variables
   <~~~*/
   function addressInit(address _mrktAdd, address _nft, address _mintAdd, address _collAdd, address _offAdd, address _tradAdd, address _bidsAdd, address _rwdsAdd, address _erc721, address _erc1155) public nonReentrant hasAdmin returns(bool){
-    marketplaceAdd = _mrktAdd;
+    marketPlaceAdd = _mrktAdd;
     nftAdd = _nft;
     marketMintAdd = _mintAdd;
     collectionsAdd = _collAdd;
@@ -206,94 +208,65 @@ contract OwnerProxy is ReentrancyGuard {
     return true;
   }
   function setControlAdd() public nonReentrant hasAdmin returns(bool){
-    Bids(bidsAdd).setControlAdd(address(this));
-    Offers(offersAdd).setControlAdd(address(this));
-    MarketMint(marketMintAdd).setControlAdd(address(this));
-    Marketplace(marketplaceAdd).setControlAdd(address(this));
-    Collections(collectionsAdd).setControlAdd(address(this));
-    Trades(tradesAdd).setControlAdd(address(this));
-    Rewards(rewardsAdd).setControlAdd(address(this));
-    RoleProvider(roleAdd).setControlAdd(address(this));
     return true;
   }
   function setMarketAdd(address _mrktAdd) hasAdmin public returns(bool){
-    marketplaceAdd = _mrktAdd;
-    Bids(bidsAdd).setMrktAdd(_mrktAdd);
-    Offers(offersAdd).setMrktAdd(_mrktAdd);
-    Trades(tradesAdd).setMrktAdd(_mrktAdd);
+    marketPlaceAdd = _mrktAdd;
+    RoleProvider(roleAdd).setMarketAdd(_mrktAdd);
     return true;
   }
   function setNftAdd(address _nft) hasAdmin public returns(bool){
     nftAdd = _nft;
-    Bids(bidsAdd).setMrktNFTAdd(_nft);
-    Offers(offersAdd).setMrktNFTAdd(_nft);
-    MarketMint(marketMintAdd).setMrktNFTAdd(_nft);
-    Marketplace(marketplaceAdd).setMrktNFTAdd(_nft);
+    RoleProvider(roleAdd).setNftAdd(_nft);
     return true;
   }
   function setMarketMintAdd(address _mintAdd) hasAdmin public returns(bool){
     marketMintAdd = _mintAdd;
-    Bids(bidsAdd).setMarketMintAdd(_mintAdd);
-    Offers(offersAdd).setMarketMintAdd(_mintAdd);
-    Trades(tradesAdd).setMarketMintAdd(_mintAdd);
-    Marketplace(marketplaceAdd).setMarketMintAdd(_mintAdd);
+    RoleProvider(roleAdd).setMarketMintAdd(_mintAdd);
     return true;
   }
    function setCollectionsAdd(address _collAdd) hasAdmin public returns(bool){
     collectionsAdd = _collAdd;
-    Bids(bidsAdd).setCollAdd(_collAdd);
-    Marketplace(marketplaceAdd).setCollAdd(_collAdd);
-    Offers(offersAdd).setCollAdd(_collAdd);
-    Trades(tradesAdd).setCollAdd(_collAdd);
+    RoleProvider(roleAdd).setCollectionsAdd(_collAdd);
     return true;
   }
   function setOffersAdd(address _offAdd) hasAdmin public returns(bool){
     offersAdd = _offAdd;
-    Marketplace(marketplaceAdd).setOffersAdd(_offAdd);
-    Trades(tradesAdd).setOffersAdd(_offAdd);
-    Bids(bidsAdd).setOffersAdd(_offAdd);
+    RoleProvider(roleAdd).setOffersAdd(_offAdd);
     return true;
   }
   function setTradesAdd(address _tradAdd) hasAdmin public returns(bool){
     tradesAdd = _tradAdd;
-    Marketplace(marketplaceAdd).setTradesAdd(_tradAdd);
-    Offers(offersAdd).setTradesAdd(_tradAdd);
-    Bids(bidsAdd).setTradesAdd(_tradAdd);
+    RoleProvider(roleAdd).setTradesAdd(_tradAdd);
     return true;
   }
   function setBidsAdd(address _bidsAdd) hasAdmin public returns(bool){
     bidsAdd = _bidsAdd;
-    Offers(offersAdd).setBidAdd(_bidsAdd);
-    Marketplace(marketplaceAdd).setBidAdd(_bidsAdd);
-    Trades(tradesAdd).setBidAdd(_bidsAdd);
+    RoleProvider(roleAdd).setBidsAdd(_bidsAdd);
     return true;
   }
   function setRwdsAdd(address _rwdsAdd) hasAdmin public returns(bool){
     rewardsAdd = _rwdsAdd;
-    Bids(bidsAdd).setRwdsAdd(_rwdsAdd);
-    Offers(offersAdd).setRwdsAdd(_rwdsAdd);
-    Marketplace(marketplaceAdd).setRwdsAdd(_rwdsAdd);
-    MarketMint(marketMintAdd).setRwdsAdd(_rwdsAdd);
+    RoleProvider(roleAdd).setRwdsAdd(_rwdsAdd);
     return true;
   }
   function setRoleAdd(address _role) public hasAdmin returns(bool){
     roleAdd = _role;
-    Bids(bidsAdd).setRoleAdd(_role);
-    Offers(offersAdd).setRoleAdd(_role);
-    MarketMint(marketMintAdd).setRoleAdd(_role);
-    Marketplace(marketplaceAdd).setRoleAdd(_role);
-    Collections(collectionsAdd).setRoleAdd(_role);
-    Trades(tradesAdd).setRoleAdd(_role);
     return true;
   }
   function setFactoryAdd(address _erc721) public hasAdmin returns(bool){
     erc721FactoryAdd = _erc721;
-    MarketMint(marketMintAdd).setNFTFactoryAdd(_erc721);
+    RoleProvider(roleAdd).setFactoryAdd(_erc721);
     return true;
   }
   function set1155FactoryAdd(address _erc1155) public hasAdmin returns(bool){
     erc1155FactoryAdd = _erc1155;
-    MarketMint(marketMintAdd).setNFT1155FactoryAdd(_erc1155);
+    RoleProvider(roleAdd).set1155FactoryAdd(_erc1155);
+    return true;
+  }
+  function setDevAdd(address _devAdd) public hasDevAdmin returns(bool){
+    devAdd = _devAdd;
+    RoleProvider(roleAdd).set1155FactoryAdd(_devAdd);
     return true;
   }
 
@@ -336,6 +309,7 @@ contract OwnerProxy is ReentrancyGuard {
     Collections(collectionsAdd).restrictMarketCollection(name, nftContract);
     return true;
   }
+
   function editMarketCollection(bool[] calldata isNotTradable, string[] calldata name, address[] calldata nftContract, uint[] calldata collectionId) hasAdmin public returns(bool){
     Collections(collectionsAdd).editMarketCollection(isNotTradable, name, nftContract, collectionId);
     return true;
@@ -357,14 +331,6 @@ contract OwnerProxy is ReentrancyGuard {
     MarketMint(marketMintAdd).setDeployAmnt(dplyAmnt);
     return true;
   }
-  function setMintNftFactoryAdd(address factory) hasAdmin public returns(bool) {
-    MarketMint(marketMintAdd).setNFTFactoryAdd(factory);
-    return true;
-  }
-  function setMintNft1155FactoryAdd(address _1155factory) hasAdmin public returns(bool) {
-    MarketMint(marketMintAdd).setNFT1155FactoryAdd(_1155factory);
-    return true;
-  }
 
   /// @notice
   /*~~~>
@@ -382,11 +348,12 @@ contract OwnerProxy is ReentrancyGuard {
   /*~~~>
   Fallback functions
   <~~~*/
-  event Received(address, uint);
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
+  event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-      emit Received(msg.sender, msg.value);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
-
   ///@notice
   //*~~~> Withdraw function for any stuck ETH sent
   function withdrawAmountFromContract(address _add) hasAdmin external {

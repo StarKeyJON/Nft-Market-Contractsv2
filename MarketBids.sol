@@ -62,6 +62,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
 /*~~~>
 Interface declarations for upgradable contracts
@@ -79,6 +80,7 @@ interface RewardsController {
 }
 interface RoleProvider {
   function hasTheRole(bytes32 role, address _address) external returns(bool);
+  function fetchAddress(bytes32 _var) external returns(address);
 }
 interface Offers {
   function fetchOfferId(uint marketId) external returns(uint);
@@ -92,7 +94,7 @@ interface Collections {
   function fetchCollection(address nftContract) external returns(bool);
 }
 
-contract MarketBids is ReentrancyGuard {
+contract MarketBids is ReentrancyGuard, Pausable {
   using SafeMath for uint;
   using Counters for Counters.Counter;
 
@@ -102,30 +104,40 @@ contract MarketBids is ReentrancyGuard {
   //*~~~> counter increments Blind Bid
   Counters.Counter private _blindBidIds;
 
-  constructor(address _role, address _mrktAdd, address _mintAdd) {
+  constructor(address _role) {
     roleAdd = _role;
-    marketAdd = _mrktAdd;
-    mintAdd = _mintAdd;
     fee = 200;
   }
 
+  //*~~~> State variables
   uint[] private openStorage;
   uint[] private blindOpenStorage;
-  address public controlAdd;
-  address public collsAdd;
-  address public marketAdd;
-  address public marketNft;
-  address public mintAdd;
-  address public tradesAdd;
-  address public offersAdd;
-  address public rewardsAdd;
-  address public PHUNKY;
   address public roleAdd;
   uint fee;
+
+  //*~~~> global address variable from Role Provider contract
+  bytes32 public constant COLLECTION = keccak256("COLLECTION");
+  address collectionAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+
+  bytes32 public constant MARKET = keccak256("MARKET");
+  address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+
+  bytes32 public constant NFT = keccak256("NFT");
+  address marketNft = RoleProvider(roleAdd).fetchAddress(NFT);
+  
+  bytes32 public constant REWARDS = keccak256("REWARDS");
+  address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+
+  bytes32 public constant OFFERS = keccak256("OFFERS");
+  address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+
+  bytes32 public constant TRADES = keccak256("TRADES");
+  address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
 
   //*~~~> Roles for designated accessibility
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE");
   bytes32 public constant CONTRACT_ROLE = keccak256("CONTRACT_ROLE");
+  bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE");
 
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
@@ -133,6 +145,10 @@ contract MarketBids is ReentrancyGuard {
   }
   modifier hasContractAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(CONTRACT_ROLE, msg.sender), "DOES NOT HAVE CONTRACT ROLE");
+    _;
+  }
+  modifier hasDevAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), "DOES NOT HAVE DEV ROLE");
     _;
   }
 
@@ -227,38 +243,6 @@ contract MarketBids is ReentrancyGuard {
   );
 
   /*~~~> Allowing for upgradability of proxy addresses <~~~*/
-  function setMrktAdd(address _mktAdd) public hasAdmin returns(bool) {
-    marketAdd = _mktAdd;
-    return true;
-  }
-  function setMrktNFTAdd(address _marketNft) public hasAdmin returns(bool){
-    marketNft = _marketNft;
-    return true;
-  }
-  function setMarketMintAdd(address _mintAdd) public hasAdmin returns(bool){
-    mintAdd = _mintAdd;
-    return true;
-  }
-  function setOffersAdd(address _offer) public hasAdmin returns(bool) {
-    offersAdd = _offer;
-    return true;
-  }
-  function setTradesAdd(address _trade) public hasAdmin returns(bool) {
-    tradesAdd = _trade;
-    return true;
-  }
-  function setCollAdd(address _coll) public hasAdmin returns(bool) {
-    collsAdd = _coll;
-    return true;
-  }
-  function setRwdsAdd(address _rwdsAdd) public hasAdmin returns(bool){
-    rewardsAdd = _rwdsAdd;
-    return true;
-  }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAdd = _contAdd;
-    return true;
-  }
   function setRoleAdd(address _role) public hasAdmin returns(bool){
     roleAdd = _role;
     return true;
@@ -295,7 +279,7 @@ contract MarketBids is ReentrancyGuard {
     uint[] memory itemId,
     uint[] memory bidValue,
     address[] memory seller
-  ) public payable returns(bool){
+  ) public payable whenNotPaused returns(bool){
     for (uint i;i<tokenId.length;i++){
       require (bidValue[i] > 1, "Must be greater than 1 gwei.");
     /*~~~> 
@@ -317,7 +301,7 @@ contract MarketBids is ReentrancyGuard {
     uint len = openStorage.length;
     if (len>=1){
       bidId = openStorage[len-1];
-      _remove(len-1,0);
+      _remove(0);
     } else {
       _bidIds.increment();
       bidId = _bidIds.current();
@@ -351,15 +335,15 @@ contract MarketBids is ReentrancyGuard {
     uint[] memory value, 
     uint[] memory tokenId, 
     uint[] memory amount, 
-    address[] memory bidAddress) public payable nonReentrant returns(bool){
+    address[] memory bidAddress) public payable whenNotPaused nonReentrant returns(bool){
     for (uint i;i<bidAddress.length;i++){
       require(value[i]>1, "Must be greater than 1 gwei.");
-      require(Collections(collsAdd).fetchCollection(bidAddress[i]) == false);
+      require(Collections(collectionAdd).fetchCollection(bidAddress[i]) == false);
       uint bidId;
       uint len = blindOpenStorage.length;
       if (len>=1){
         bidId=blindOpenStorage[len-1];
-        _remove(len-1,1);
+        _remove(1);
       } else {
         _blindBidIds.increment();
         bidId = _blindBidIds.current();
@@ -395,8 +379,8 @@ contract MarketBids is ReentrancyGuard {
     uint[] memory blindBidId, 
     uint[] memory tokenId,
     uint[] memory listedId, 
-    bool[] memory is1155) public nonReentrant returns(bool){
-    uint balance = IERC721(marketNft).balanceOf(msg.sender);
+    bool[] memory is1155) public whenNotPaused nonReentrant returns(bool){
+    uint balance = IERC721(marketAdd).balanceOf(msg.sender);
     for (uint i;i<blindBidId.length;i++){
       BlindBid memory bid = idToBlindBid[blindBidId[i]];
       //*~~~> Disallow random acceptances if specific
@@ -447,7 +431,7 @@ contract MarketBids is ReentrancyGuard {
   /// @return Bool
   function acceptBidForNft(
       uint[] memory bidId
-  ) public nonReentrant returns (bool) {
+  ) public whenNotPaused nonReentrant returns (bool) {
     uint balance = IERC721(marketNft).balanceOf(msg.sender);
     for (uint i; i<bidId.length; i++){
       Bid memory bid = idToNftBid[bidId[i]];
@@ -493,7 +477,7 @@ contract MarketBids is ReentrancyGuard {
       isBlind: if it is a blind blind (true);
     <~~~*/
   /// @return Bool
-  function withdrawBid(uint[] memory bidId, bool[] memory isBlind) public nonReentrant returns(bool){
+  function withdrawBid(uint[] memory bidId, bool[] memory isBlind) public whenPaused nonReentrant returns(bool){
     for (uint i;i<bidId.length;i++){
       if (isBlind[i]){
         BlindBid memory bid = idToBlindBid[bidId[i]];
@@ -578,13 +562,7 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
         We use the last item in the storage (length of array - 1),
         in order to pop off the item and avoid rewriting 
   <~~~*/
-  /// @dev
-    /*~~~>
-      _index: index of the id to be removed;
-      store: if regular bid (0) else if blind bid (1)
-    <~~~*/
-  function _remove(uint _index, uint store) internal {
-      require(_index < openStorage.length, "index out of bounds");
+  function _remove(uint store) internal {
       if (store==0){
       openStorage.pop();
       } else if (store==1){
@@ -606,11 +584,35 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
     return bids;
   }
 
+  function fetchBidItemsByBidder(address bidder) public view returns (Bid[] memory) {
+    uint bidcount = _bidIds.current();
+    Bid[] memory bids = new Bid[](bidcount);
+    for (uint i; i < bidcount; i++) {
+      if (idToNftBid[i + 1].bidder == bidder) {
+        Bid storage currentItem = idToNftBid[i + 1];
+        bids[i] = currentItem;
+      }
+    }
+    return bids;
+  }
+
   function fetchBlindBidItems() public view returns (BlindBid[] memory) {
     uint bidcount = _blindBidIds.current();
     BlindBid[] memory bids = new BlindBid[](bidcount);
     for (uint i; i < bidcount; i++) {
       if (idToBlindBid[i + 1].bidValue > 0) {
+        BlindBid storage currentItem = idToBlindBid[i + 1];
+        bids[i] = currentItem;
+      }
+    }
+    return bids;
+  }
+
+  function fetchBlindBidItemsByBidder(address bidder) public view returns (BlindBid[] memory) {
+    uint bidcount = _blindBidIds.current();
+    BlindBid[] memory bids = new BlindBid[](bidcount);
+    for (uint i; i < bidcount; i++) {
+      if (idToBlindBid[i + 1].bidder == bidder) {
         BlindBid storage currentItem = idToBlindBid[i + 1];
         bids[i] = currentItem;
       }
@@ -638,11 +640,19 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
     return _id;
   }
 
+  ///@notice DEV operations for emergency functions
+  function pause() public hasDevAdmin {
+      _pause();
+  }
+  function unpause() public hasDevAdmin {
+      _unpause();
+  }
+
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 }

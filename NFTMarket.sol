@@ -168,9 +168,9 @@ contract NFTMarket is ReentrancyGuard, Pausable {
     address payable owner;
   }
 
-  /*~~~> Memory array of all listed Market Items <~~~*/
+  /*~~~> Memory array of item id to market item <~~~*/
   mapping(uint256 => MktItem) private idToMktItem;
-  // Maps how many items the user has listed for sale
+  // Maps the balance of items that the user has listed for sale
   mapping(address => uint) public addressToUserBal;
 
   /*~~~> Declaring event object structure for Nft Listed for sale <~~~*/
@@ -236,8 +236,8 @@ contract NFTMarket is ReentrancyGuard, Pausable {
     is1155: (true) if item is ERC1155;
     amount1155: amount of ERC1155 to trade;
     tokenId: token Id of the item to list;
-    price: eth value wanted to purchase;
-    nftContract: contract of item to list on the market;
+    price: eth value wanted for purchase;
+    nftContract: contract address of item to list on the market;
   <~~~*/
   ///@return Bool
   function listMktItem(
@@ -248,12 +248,11 @@ contract NFTMarket is ReentrancyGuard, Pausable {
     address[] memory nftContract
   ) public payable whenNotPaused nonReentrant returns(bool){
 
-    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
     address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
 
     uint user = addressToUserBal[msg.sender];
     if (user==0) {
-        RewardsController(rewardsAdd).createUser(msg.sender);
+        RewardsController(RoleProvider(roleAdd).fetchAddress(REWARDS)).createUser(msg.sender);
       }
     uint tokenLen = tokenId.length;
     for (uint i;i<tokenLen;i++){
@@ -277,16 +276,15 @@ contract NFTMarket is ReentrancyGuard, Pausable {
         idToMktItem[itemId] =  MktItem(true, itemId, amount1155[i], price[i], tokenId[i], nftContract[i], payable(msg.sender), payable(msg.sender));
       }
       //*~~~> Add a new count to user balances
-      addressToUserBal[msg.sender]= addressToUserBal[msg.sender]+1;
+      addressToUserBal[msg.sender] = addressToUserBal[msg.sender]+1;
       emit ItemListed(itemId, price[i], tokenId[i], nftContract[i], msg.sender);
     }
-    
     return true;
   }
 
 
   /// @notice 
-  /*~~~> Public function to delist NFTs Tokens for sale <~~~*/
+  /*~~~> Public function to delist NFTs <~~~*/
   ///@dev
   /*~~~>
     itemId: itemId for internal storage location;
@@ -333,7 +331,7 @@ contract NFTMarket is ReentrancyGuard, Pausable {
       openStorage.push(itemId[i]);
       idToMktItem[itemId[i]] =  MktItem(false, itemId[i], 0, 0, 0, address(0x0), payable(0x0), payable(0x0));
       emit ItemDelisted(itemId[i], it.tokenId, it.nftContract);
-      //*~~~> remove uint from user balances
+      //*~~~> remove count from user balances
       addressToUserBal[msg.sender] = addressToUserBal[msg.sender]-1;
       }
       //*~~~> Check to see if user has any remaining items listed after iteration
@@ -348,7 +346,6 @@ contract NFTMarket is ReentrancyGuard, Pausable {
   /*~~~> Public function to buy(purchase) NFTs <~~~*/
   ///@dev
   /*~~~>
-    nftContract: contract of item to sell on the market;
     itemId: itemId for internal storage location;
   <~~~*/
   ///@return Bool
@@ -360,9 +357,8 @@ contract NFTMarket is ReentrancyGuard, Pausable {
     address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
     address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
     address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
-    address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
 
-    uint balance = IERC721(mrktNft).balanceOf(msg.sender);
+    uint balance = IERC721(RoleProvider(roleAdd).fetchAddress(NFTADD)).balanceOf(msg.sender);
     uint prices=0;
     uint length = itemId.length;
     for (uint i; i < length; i++) {
@@ -375,33 +371,28 @@ contract NFTMarket is ReentrancyGuard, Pausable {
       if(balance<1){
         /*~~~> Calculating the platform fee <~~~*/
         uint256 _fee = calcFee(it.price);
-        uint256 split = _fee.div(3);
-        uint256 reward = _fee.sub(split);
-        // Users get 2/3s of fees
-        RewardsController(rewardsAdd).splitRewards{value: reward}(reward);
-        // DAO gets 1/3 of fees
-        RewardsController(rewardsAdd).depositEthToDAO{value: split}();
-        payable(it.seller).transfer(it.price.sub(_fee));
+        uint256 userAmnt = it.price.sub(_fee);
+        // send _fee to rewards controller
+        RewardsController(rewardsAdd).splitRewards{value: _fee}(_fee);
+        // send (listed amount - _fee) to seller
+        payable(it.seller).transfer(userAmnt);
       }
-      uint bidId = Bids(bidsAdd).fetchBidId(itemId[i]);
-      if (bidId>0) {
+      if (Bids(bidsAdd).fetchBidId(itemId[i])>0) {
       /*~~~> Kill bid and refund bidValue <~~~*/
         //~~~> Call the contract to refund the ETH offered for a bid
-        Bids(bidsAdd).refundBid(bidId);
+        Bids(bidsAdd).refundBid(Bids(bidsAdd).fetchBidId(itemId[i]));
       }
         /*~~~> Check for the case where there is a trade and refund it. <~~~*/
-      uint offerId = Offers(offersAdd).fetchOfferId(itemId[i]);
-      if (offerId > 0) {
+      if (Offers(offersAdd).fetchOfferId(itemId[i]) > 0) {
       /*~~~> Kill offer and refund amount <~~~*/
         //*~~~> Call the contract to refund the NFT offered for trade
-        Offers(offersAdd).refundOffer(itemId[i], offerId);
+        Offers(offersAdd).refundOffer(itemId[i], Offers(offersAdd).fetchOfferId(itemId[i]));
       }
       /*~~~> Check for the case where there is an offer and refund it. <~~~*/
-      uint tradeId = Trades(tradesAdd).fetchTradeId(itemId[i]);
-      if (tradeId > 0) {
+      if (Trades(tradesAdd).fetchTradeId(itemId[i]) > 0) {
       /*~~~> Kill offer and refund amount <~~~*/
         //*~~~> Call the contract to refund the ERC20 offered for trade
-        Trades(tradesAdd).refundTrade(itemId[i], tradeId);
+        Trades(tradesAdd).refundTrade(itemId[i], Trades(tradesAdd).fetchTradeId(itemId[i]));
       }
       if(it.is1155){
         IERC1155(it.nftContract).safeTransferFrom(address(this), msg.sender, it.tokenId, it.amount1155, "");

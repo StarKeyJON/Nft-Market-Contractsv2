@@ -186,14 +186,14 @@ contract Mint is ReentrancyGuard, Pausable {
 
   /// @notice
   /*~~~>
-    Function for setting the redemption token details
+    Function for re - setting the redemption token details
   <~~~*/
   /// @dev
   /*~~~>
     uint64 _redeemAmount: Amount needed to redeem a NFT; 
     address _contract: address of the redemption token;
   <~~~*/
-  function setRedemptionToken(uint64 _redeemAmount, address _contract) public hasAdmin returns(bool){
+  function resetRedemptionToken(uint64 _redeemAmount, address _contract) public hasAdmin returns(bool){
     uint index = _indexToRedemptionToken[_contract];
     RedemptionToken memory red = _idToRedemption[index];
     red = RedemptionToken(_redeemAmount, _contract);

@@ -117,22 +117,16 @@ contract MarketBids is ReentrancyGuard, Pausable {
 
   //*~~~> global address variable from Role Provider contract
   bytes32 public constant COLLECTION = keccak256("COLLECTION");
-  address collectionAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
 
   bytes32 public constant MARKET = keccak256("MARKET");
-  address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
 
   bytes32 public constant NFT = keccak256("NFT");
-  address marketNft = RoleProvider(roleAdd).fetchAddress(NFT);
   
   bytes32 public constant REWARDS = keccak256("REWARDS");
-  address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
 
   bytes32 public constant OFFERS = keccak256("OFFERS");
-  address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
 
   bytes32 public constant TRADES = keccak256("TRADES");
-  address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
 
   //*~~~> Roles for designated accessibility
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE");
@@ -336,6 +330,9 @@ contract MarketBids is ReentrancyGuard, Pausable {
     uint[] memory tokenId, 
     uint[] memory amount, 
     address[] memory bidAddress) public payable whenNotPaused nonReentrant returns(bool){
+    
+    address collectionAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+    
     for (uint i;i<bidAddress.length;i++){
       require(value[i]>1, "Must be greater than 1 gwei.");
       require(Collections(collectionAdd).fetchCollection(bidAddress[i]) == false);
@@ -380,7 +377,11 @@ contract MarketBids is ReentrancyGuard, Pausable {
     uint[] memory tokenId,
     uint[] memory listedId, 
     bool[] memory is1155) public whenNotPaused nonReentrant returns(bool){
+    
+    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
     uint balance = IERC721(marketAdd).balanceOf(msg.sender);
+
     for (uint i;i<blindBidId.length;i++){
       BlindBid memory bid = idToBlindBid[blindBidId[i]];
       //*~~~> Disallow random acceptances if specific
@@ -432,6 +433,13 @@ contract MarketBids is ReentrancyGuard, Pausable {
   function acceptBidForNft(
       uint[] memory bidId
   ) public whenNotPaused nonReentrant returns (bool) {
+
+    address marketNft = RoleProvider(roleAdd).fetchAddress(NFT);
+    address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+    address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+    address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
+    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+
     uint balance = IERC721(marketNft).balanceOf(msg.sender);
     for (uint i; i<bidId.length; i++){
       Bid memory bid = idToNftBid[bidId[i]];

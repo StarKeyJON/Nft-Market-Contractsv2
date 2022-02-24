@@ -116,28 +116,19 @@ contract MarketTrades is ReentrancyGuard, Pausable {
 
   //*~~~> global address variable from Role Provider contract
   bytes32 public constant MARKET = keccak256("MARKET");
-  address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
-
-  bytes32 public constant MINT = keccak256("MINT");
-  address mintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
 
   bytes32 public constant BIDS = keccak256("BIDS");
-  address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
 
   bytes32 public constant COLLECTION = keccak256("COLLECTION");
-  address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
 
   bytes32 public constant OFFERS = keccak256("OFFERS");
-  address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
 
   uint[] private openStorage;
   uint[] private blindOpenStorage;
 
   //*~~~> Fee constructor initially set to .005%
-  constructor(address _role, address _mrktAdd, address _mintAdd){
+  constructor(address _role){
     roleAdd = _role;
-    marketAdd = _mrktAdd;
-    mintAdd = _mintAdd;
   }
 
   //*~~~> Declaring object struct for trades entered
@@ -307,6 +298,9 @@ contract MarketTrades is ReentrancyGuard, Pausable {
       address[] memory nftContract,
       address[] memory wantContract
   ) public whenNotPaused nonReentrant{
+
+    address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+
     for (uint i;i<tokenId.length;i++) {
       uint tradeId;
       if (blindOpenStorage.length>=1) {
@@ -441,6 +435,11 @@ contract MarketTrades is ReentrancyGuard, Pausable {
       uint[] calldata itemId,
       uint[] calldata tradeId
   ) public nonReentrant returns(bool){
+    
+    address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+    address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+    address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+
     for(uint i; i<itemId.length;i++) {
       Trade memory trade = idToNftTrade[tradeId[i]];
       require(msg.sender == trade.seller,"Not Owner");
@@ -505,6 +504,7 @@ contract MarketTrades is ReentrancyGuard, Pausable {
       uint[] memory tokenId,
       uint[] memory listedId
   ) public whenNotPaused nonReentrant returns(bool){
+    address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
     for(uint i; i<tradeId.length;i++) {
       uint j = tradeId[i];
       BlindTrade memory trade = idToBlindTrade[j];

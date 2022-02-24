@@ -133,19 +133,14 @@ contract NFTMarket is ReentrancyGuard, Pausable {
 
   //*~~~> global address variable from Role Provider contract
   bytes32 public constant REWARDS = keccak256("REWARDS");
-  address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
 
   bytes32 public constant COLLECTION = keccak256("COLLECTION");
-  address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
   
   bytes32 public constant BIDS = keccak256("BIDS");
-  address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
   
   bytes32 public constant OFFERS = keccak256("OFFERS");
-  address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
   
   bytes32 public constant TRADES = keccak256("TRADES");
-  address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
 
   bytes32 public constant NFTADD = keccak256("NFT");
   address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
@@ -256,6 +251,10 @@ contract NFTMarket is ReentrancyGuard, Pausable {
     uint[] memory price,
     address[] memory nftContract
   ) public payable whenNotPaused nonReentrant returns(bool){
+
+    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+
     uint user = addressToUserBal[msg.sender];
     if (user==0) {
         RewardsController(rewardsAdd).createUser(msg.sender);
@@ -263,7 +262,7 @@ contract NFTMarket is ReentrancyGuard, Pausable {
     uint tokenLen = tokenId.length;
     for (uint i;i<tokenLen;i++){
         require(Collections(collsAdd).fetchCollection(nftContract[i]) == false);
-        require(price[i] > 1e14);
+        require(price[i] >= 1e14);
         uint itemId;
         uint len = openStorage.length;
         if (len>=1){
@@ -300,6 +299,12 @@ contract NFTMarket is ReentrancyGuard, Pausable {
   function delistMktItems(
     uint256[] calldata itemId
   ) public whenPaused nonReentrant returns(bool){
+
+    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+    address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+    address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
+
     for (uint i;i<itemId.length;i++){
       MktItem memory it = idToMktItem[itemId[i]];
       require(it.seller == msg.sender, "Not owner");
@@ -354,6 +359,12 @@ contract NFTMarket is ReentrancyGuard, Pausable {
   function buyMarketItems(
     uint256[] memory itemId
     ) public payable whenNotPaused nonReentrant returns(bool) {
+    
+    address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+    address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+    address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
+    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+
     uint balance = IERC721(mrktNft).balanceOf(msg.sender);
     uint prices=0;
     uint length = itemId.length;
@@ -584,6 +595,11 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
 
   ///@notice internal function to transfer NFT only this contract can call
   function _transferForSale(address receiver, uint itemId) internal {
+
+    address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+    address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
+    address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+
     MktItem memory it = idToMktItem[itemId];
     if ( it.is1155 ){
         IERC1155(it.nftContract).safeTransferFrom(address(this), payable(receiver), it.tokenId, it.amount1155, "");

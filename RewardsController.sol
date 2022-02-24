@@ -92,7 +92,6 @@ contract RewardsControl is ReentrancyGuard, Pausable {
 
   //*~~~> upgradable proxy contract addresses
   bytes32 public constant NFTADD = keccak256("NFT");
-  address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
 
   bytes32 public constant MINT = keccak256("MINT");
   address mintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
@@ -361,6 +360,9 @@ contract RewardsControl is ReentrancyGuard, Pausable {
 
   //*~~~> Claims eligible rewards for NFT holders <~~~*//
   function claimNFTRewards(uint nftId) public nonReentrant {
+    
+    address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
+
     require(IERC721(mrktNft).balanceOf(msg.sender)>0,"Ineligible!");
     User memory user = nftIdToUser[nftId];
     // Limiting claim abilities to every other day

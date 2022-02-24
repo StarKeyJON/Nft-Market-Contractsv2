@@ -94,7 +94,7 @@ interface MarketMint {
   function setDeployAmnt(uint _deplyAmnt) external;
   function setRoleAdd(address _role) external;
   function setNewRedemption(uint amount, address _toke) external;
-  function setRedemptionToken(uint64 _redeemAmount, address _contract) external;
+  function resetRedemptionToken(uint64 _redeemAmount, address _contract) external;
 }
 interface RoleProvider {
   function fetchAddress(bytes32 _var) external returns(address);
@@ -294,9 +294,9 @@ contract OwnerProxy is ReentrancyGuard, Pausable {
     MarketMint(marketMintAdd).setNewRedemption(amount, _toke);
     return true;
   }
-  function setMintRedemptionToken(uint64 _redeemAmount, address _contract) hasAdmin public returns(bool){
+  function resetMintRedemptionToken(uint64 _redeemAmount, address _contract) hasAdmin public returns(bool){
     address marketMintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
-    MarketMint(marketMintAdd).setRedemptionToken(_redeemAmount, _contract);
+    MarketMint(marketMintAdd).resetRedemptionToken(_redeemAmount, _contract);
     return true;
   }
   function setMintDeployAmnt(uint dplyAmnt) hasAdmin public returns(bool){

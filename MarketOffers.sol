@@ -132,22 +132,16 @@ contract MarketOffers is ReentrancyGuard, Pausable {
 
   //*~~~> global address variable from Role Provider contract
   bytes32 public constant NFTADD = keccak256("NFT");
-  address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
 
   bytes32 public constant REWARDS = keccak256("REWARDS");
-  address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
 
   bytes32 public constant MARKET = keccak256("MARKET");
-  address mrktAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
 
   bytes32 public constant BIDS = keccak256("BIDS");
-  address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
   
   bytes32 public constant TRADES = keccak256("TRADES");
-  address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
 
   bytes32 public constant MINT = keccak256("MINT");
-  address mintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
 
   bytes32 public constant COLLECTION = keccak256("COLLECTION");
   address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
@@ -155,10 +149,8 @@ contract MarketOffers is ReentrancyGuard, Pausable {
 
 
   //*~~~> sets deployment address as default admin role
-  constructor(address _role, address _mrktAdd, address _mintAdd) {
+  constructor(address _role) {
     roleAdd = _role;
-    mrktAdd = _mrktAdd;
-    mintAdd = _mintAdd;
     fee = 200;
   }
 
@@ -244,7 +236,11 @@ contract MarketOffers is ReentrancyGuard, Pausable {
     fee = _fee;
     return true;
   }
-  
+  function setRoleAdd(address _role) public hasAdmin returns(bool){
+    roleAdd = _role;
+    return true;
+  }
+
   /// @notice 
   /*~~~> 
     Calculating the platform fee, 
@@ -379,6 +375,11 @@ contract MarketOffers is ReentrancyGuard, Pausable {
     bool[] memory isListed,
     bool[] memory is1155
   ) public nonReentrant returns(bool){
+
+    address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
+    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address mrktAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+
     uint balance = IERC721(mrktNft).balanceOf(msg.sender);
     for (uint i; i<blindOfferId.length;i++){
       BlindOffer memory offer = idToBlindOffer[blindOfferId[i]];
@@ -419,18 +420,28 @@ contract MarketOffers is ReentrancyGuard, Pausable {
   <~~~*/
   ///@return Bool
   function acceptOfferForNft(uint[] calldata offerId) public nonReentrant returns(bool){
+
+    address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
+    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+    address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
+    address mrktAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+
     uint balance = IERC721(mrktNft).balanceOf(msg.sender);
     for (uint i; i<offerId.length; i++) {
       Offer memory offer = idToMktOffer[offerId[i]];
       if (msg.sender != offer.seller) revert();
       IERC20 tokenContract = IERC20(offer.tokenCont);
       if(balance<1){
+
         uint256 _fee = calcFee(offer.amount);
         uint256 split = _fee.div(3);
         (tokenContract).transfer(payable(rewardsAdd), _fee.sub(split));
+        
         Rewards(rewardsAdd).depositERC20Rewards(_fee.sub(split), offer.tokenCont);
-        (tokenContract).transfer(payable(mintAdd), split);
-        Rewards(rewardsAdd).depositDAOERC20Rewards(split, offer.tokenCont);    
+
+        Rewards(rewardsAdd).depositDAOERC20Rewards(split, offer.tokenCont);
+
         (tokenContract).transfer(payable(offer.offerer), offer.amount.sub(_fee));
       } else {
         (tokenContract).transfer(payable(offer.offerer), offer.amount);

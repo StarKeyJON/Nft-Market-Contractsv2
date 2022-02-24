@@ -118,7 +118,7 @@ contract MarketRoleProvider is AccessControl {
     marketBytes[PROXY]=_proxyAdd;
     return true;
   }
-  function setFactoryAdd(address _erc721) public hasAdmin returns(bool){
+  function set721FactoryAdd(address _erc721) public hasAdmin returns(bool){
     erc721FactoryAdd = _erc721;
     marketBytes[ERC721FACTORY] = _erc721;
     return true;

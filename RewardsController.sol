@@ -78,9 +78,9 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   using Counters for Counters.Counter;
 
   /*~~~> 
-    amount receivable for PHUNKY DAO;
+    amount receivable for dev phund;
   <~~~*/
-  uint amountReceivable;
+  uint devEth;
   uint[] tokenAmount;
   address[] tokenAddresses;
 
@@ -392,8 +392,8 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     Dev memory _dev = idToDev[devId];
     require(_dev.timestamp > 0, "Ineligible!");
     require(_dev.timestamp < (block.timestamp - 1 days));
-    if (amountReceivable > 0){
-      payable(msg.sender).transfer(amountReceivable.div(devLen));
+    if (devEth > 0){
+      payable(msg.sender).transfer(devEth.div(devLen));
     }
     if (tokenAmount.length > 0){
       for (uint j; j < tokenAmount.length; j++) {
@@ -411,7 +411,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   function splitRewards(uint _split) public payable returns(bool) {
     uint splits = _split.div(4);
     uint userAmnt = splits.mul(3);
-    amountReceivable = amountReceivable.add(splits);
+    devEth = devEth.add(splits);
     split = split.add(userAmnt);
     return true;
   }
@@ -451,8 +451,8 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   ///*~~~> For DAO Rewards claims
   Counters.Counter private _ERC20Rewards;
   
-  address public accountReceiver;
-  uint public accountsReceivable;
+  address public dao;
+  uint public daoEth;
 
   mapping (address => uint) private _indexToRewardsToken;
   mapping (uint256 => ERC20Reward) private _idToERC20;
@@ -461,11 +461,6 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   struct ERC20Reward {
     uint claimAmount;
     address contractAddress;
-  }
-
-  function setAccountRcv(address _recvr) public hasAdmin returns(bool){
-    accountReceiver = _recvr;
-    return true;
   }
 
   /// @notice
@@ -504,7 +499,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     Function for depositing ETH
   <~~~*/
   function depositEthToDAO() payable public returns(bool) {
-    accountsReceivable = accountsReceivable.add(msg.value);
+    daoEth = daoEth.add(msg.value);
     return true;
   }
 
@@ -521,8 +516,8 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     Only accountReceiver address will receive anything;
   <~~~*/
   function withdrawDAORewards() public nonReentrant {
-    if (msg.sender == accountReceiver) {
-      payable(accountReceiver).transfer(accountsReceivable);
+    if (msg.sender == dao) {
+      payable(dao).transfer(daoEth);
       uint count = _ERC20Rewards.current();
       for (uint i; i < count; i++) {
         ERC20Reward memory token = _idToERC20[i+1];
@@ -590,7 +585,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     return user;
   }
 
-  function fetchTime() public view returns (ClaimClock memory time){
+  function fetchClaimTime() public view returns (ClaimClock memory time){
     return idToClock[8];
   }
 

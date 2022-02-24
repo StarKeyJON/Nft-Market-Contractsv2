@@ -84,6 +84,7 @@ contract MarketCollections {
 
   //*~~~> Roles for designated accessibility
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
+  bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE"); 
   string Mess = "DOES NOT HAVE ADMIN ROLE";
   address public roleAdd;
   
@@ -92,6 +93,10 @@ contract MarketCollections {
   }
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), Mess);
+    _;
+  }
+  modifier hasDevAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), Mess);
     _;
   }
 
@@ -103,8 +108,14 @@ contract MarketCollections {
     address collectionContract;
   }
 
+  struct TokenList{
+    bool canOffer;
+    address tokenAdd;
+  }
+
   //*~~~> Memory array of all listed Market Collections
   mapping(uint256 => MarketCollection) private idToCollection;
+  mapping(address => TokenList) private addressToToken;
 
   //*~~~> Declaring event object structure for new collection added
   event CollectionAdded(
@@ -168,6 +179,18 @@ contract MarketCollections {
       emit CollectionAdded(collectionId[i], name[i], nftContract[i]);
     }
     return true;
+  }
+
+  //*~~~> sets approved tokens for offers
+  function setTokenList(bool[] calldata _canOffer, address[] calldata _token) public hasDevAdmin returns (bool) {
+    for (uint i; i < _token.length; i++){
+      addressToToken[_token[i]] = TokenList(_canOffer[i], _token[i]);
+    }
+    return true;
+  }
+
+  function canOfferToken(address token) public view returns(bool){
+    return addressToToken[token].canOffer;
   }
 
   /// @notice

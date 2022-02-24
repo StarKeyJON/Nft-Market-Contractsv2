@@ -110,10 +110,8 @@ contract Mint is ReentrancyGuard, Pausable {
   address public roleAdd;
 
   bytes32 public constant NFTADD = keccak256("NFT");
-  address nftAddress = RoleProvider(roleAdd).fetchAddress(NFTADD);
 
   bytes32 public constant REWARDS = keccak256("REWARDS");
-  address rewardsAddress = RoleProvider(roleAdd).fetchAddress(REWARDS);
 
   bytes32 public constant ERC721FACTORY = keccak256("ERC721FACTORY");
   address nftFactory = RoleProvider(roleAdd).fetchAddress(ERC721FACTORY);
@@ -233,6 +231,10 @@ contract Mint is ReentrancyGuard, Pausable {
   <~~~*/
   /// @return Bool
   function redeemForNft(uint id, uint amount, address to, string memory uri) public whenNotPaused returns(bool){
+
+    address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address nftAddress = RoleProvider(roleAdd).fetchAddress(NFTADD);
+
     RedemptionToken memory token = _idToRedemption[id];
     require(amount >= token.redeemAmount);
 
@@ -268,6 +270,9 @@ contract Mint is ReentrancyGuard, Pausable {
   <~~~*/
   /// @return Bool
   function newNftContract(address controller, address minter, string calldata name, string calldata symbol) public payable whenNotPaused returns(bool) {
+    
+    address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
+
     require(msg.value >= deployAmount);
     NftFactory(nftFactory).newNftContract(controller, minter, name, symbol);
     RewardsController(rewardsAddress).depositEthToDAO{value: msg.value}();
@@ -297,6 +302,9 @@ contract Mint is ReentrancyGuard, Pausable {
   <~~~*/
   /// @return Bool
   function new1155Contract(address controller, address minter, string calldata tokenURI) public payable whenNotPaused returns(bool) {
+
+    address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
+    
     require(msg.value >= deployAmount);
     Nft1155Factory(nftFactory).new1155Contract(controller, minter, tokenURI);
     RewardsController(rewardsAddress).depositEthToDAO{value: msg.value}();

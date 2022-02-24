@@ -151,13 +151,17 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   <~~~*/
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
   bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE"); 
-
+  bytes32 public constant CONTRACT_ROLE = keccak256("CONTRACT_ROLE");
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
     _;
   }
   modifier hasDevAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), "DOES NOT HAVE DEV ROLE");
+    _;
+  }
+  modifier hasContractAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(CONTRACT_ROLE, msg.sender), "DOES NOT HAVE CONTRACT ROLE");
     _;
   }
 
@@ -237,7 +241,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
      userAddress: user address;
         <~~~*/
     /// @return Bool
-  function createUser(address userAddress) public hasAdmin nonReentrant returns(bool) {
+  function createUser(address userAddress) public hasContractAdmin nonReentrant returns(bool) {
     uint userId;
     uint len = openStorage.length;
     if (len>=1){
@@ -246,14 +250,6 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     } else {
       _users.increment();
       userId = _users.current();
-    }
-    uint tokenlen = _tokens.current();
-    uint[] memory amnt;
-    address[] memory tokeAdd;
-    for (uint i; i < tokenlen; i++) {
-      Token memory toke = idToTokens[i+1];
-      tokeAdd[i] = toke.tokenAddress;
-      amnt[i] = 0;
     }
     addressToId[userAddress] = userId;
     User memory user = User(true, 0, block.timestamp, userId, userAddress);
@@ -270,30 +266,14 @@ contract RewardsControl is ReentrancyGuard, Pausable {
      userAddress: user address;
         <~~~*/
   /// @return Bool
-  function setUser(bool canTrade, address userAddress) public hasAdmin nonReentrant returns(bool) {
+  function setUser(bool canTrade, address userAddress) public hasContractAdmin nonReentrant returns(bool) {
     uint userId = addressToId[userAddress];
     User memory user = idToUser[userId];
     if (canTrade){
-      uint tokenlen = _tokens.current();
-      uint[] memory amnt;
-      address[] memory tokeAdd;
-      for (uint i; i < tokenlen; i++) {
-        Token memory toke = idToTokens[i+1];
-        tokeAdd[i] = toke.tokenAddress;
-        amnt[i] = 0;
-      }
       idToUser[userId] = User(true, 0, user.timestamp, user.userId, address(0x0));
     } else {
       openStorage.push(userId);
       addressToId[userAddress] = 0;
-      uint tokenlen = _tokens.current();
-      uint[] memory amnt;
-      address[] memory tokeAdd;
-      for (uint i; i < tokenlen; i++) {
-        Token memory toke = idToTokens[i+1];
-        tokeAdd[i] = toke.tokenAddress;
-        amnt[i] = 0;
-      }
       idToUser[userId] = User(false, 0, 0, 0,  address(0x0));
     }
     return true;
@@ -612,40 +592,8 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     return user;
   }
 
-  function fetchUserEthRewards(address userAdd) public returns (uint result){
-    User memory user = addressToUser[userAdd];
-    if(user.canClaim){
-      uint throttle=1;
-      if(user.timestamp > (block.timestamp - 2 days)){
-        throttle = 2;
-      }
-      uint users = fetchUserAmnt();
-      uint nfts = MarketMint(mintAdd).fetch1155NFTContractsCreated();
-      uint totalUsers = users.add(nfts);
-      uint splits = split.div(totalUsers).div(throttle);
-      result = splits;
-    }
-    return result;
-  }
-
-  function fetchUserErcRewards(address userAdd) public returns(address[] memory addresses, uint[] memory result){
-    User memory user = addressToUser[userAdd];
-    if(user.canClaim){
-      uint throttle = 1;
-      if(user.timestamp > (block.timestamp - 2 days)){
-        throttle = 2;
-      }
-      uint users = fetchUserAmnt();
-      uint nfts = MarketMint(mintAdd).fetch1155NFTContractsCreated();
-      uint totalUsers = users.add(nfts);
-      for (uint i; i<_tokens.current(); i++) {
-        Token memory toke = idToTokens[i+1];
-        uint ercSplit = (toke.tokenAmount.div(totalUsers)).div(throttle);
-        addresses[i] = toke.tokenAddress;
-        result[i] = ercSplit;
-      }
-    }
-    return (addresses, result);
+  function fetchTime() public view returns (ClaimClock memory time){
+    return idToClock[8];
   }
 
   //*~~~> Fallback functions

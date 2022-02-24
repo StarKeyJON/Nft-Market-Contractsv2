@@ -70,9 +70,6 @@ pragma solidity  >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-interface Phunky {
-  function balanceOf(address owner) external view returns(uint256);
-}
 interface RoleProvider {
   function hasTheRole(bytes32 role, address _address) external returns(bool);
 }
@@ -89,7 +86,6 @@ contract MarketCollections {
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
   string Mess = "DOES NOT HAVE ADMIN ROLE";
   address public roleAdd;
-  address public controlAdd;
   
   constructor(address _role) {
     roleAdd = _role;
@@ -127,10 +123,6 @@ contract MarketCollections {
 
   function setRoleAdd(address _role) public hasAdmin returns(bool){
     roleAdd = _role;
-    return true;
-  }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAdd = _contAdd;
     return true;
   }
 
@@ -216,11 +208,11 @@ contract MarketCollections {
   }
 
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 }
 

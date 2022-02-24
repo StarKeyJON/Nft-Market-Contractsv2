@@ -95,6 +95,7 @@ interface Trades {
 }
 interface Collections {
   function fetchCollection(address nftContract) external returns(bool);
+  function canOfferToken(address token) external returns(bool);
 }
 
 contract MarketOffers is ReentrancyGuard, Pausable {
@@ -275,6 +276,7 @@ contract MarketOffers is ReentrancyGuard, Pausable {
     address[] memory seller
   ) public nonReentrant returns(bool){
       for (uint i; i< itemId.length; i++) {
+      require(Collections(collsAdd).canOfferToken(tokenCont[i]),"Unknown token!");
       require (amount[i] > 0,"Amount needs to be > 0");
       
       IERC20 tokenContract = IERC20(tokenCont[i]);
@@ -383,11 +385,8 @@ contract MarketOffers is ReentrancyGuard, Pausable {
       IERC20 tokenContract = IERC20(offer.tokenCont);
       if(balance<1){
         uint256 _fee = calcFee(offer.amount);
-        uint256 split = _fee.div(3);
-        (tokenContract).transfer(payable(rewardsAdd), _fee.sub(split));
-        Rewards(rewardsAdd).depositERC20Rewards(_fee.sub(split), offer.tokenCont);
-        (tokenContract).transfer(payable(mintAdd), split);
-        Rewards(rewardsAdd).depositDAOERC20Rewards(split, offer.tokenCont);    
+
+        Rewards(rewardsAdd).depositDAOERC20Rewards(_fee, offer.tokenCont);    
         (tokenContract).transfer(payable(offer.offerer), offer.amount.sub(_fee));
       } else {
         (tokenContract).transfer(payable(offer.offerer), offer.amount);

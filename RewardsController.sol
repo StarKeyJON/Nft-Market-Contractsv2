@@ -85,7 +85,6 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   address[] tokenAddresses;
 
   //*~~~> Addresses!
-  address private devSig;
   address roleAdd;
 
   //*~~~> Split is amount of ETH to split between users;
@@ -116,9 +115,8 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   mapping(address => uint) private addressToDevId;
   mapping(uint => ClaimClock) private idToClock;
 
-  constructor(address _role, address devPhund) {
+  constructor(address _role) {
     roleAdd = _role;
-    devSig = devPhund;
   }
 
   //*~~~> Declaring object structures for User Rewards & Tokens <~~~*/

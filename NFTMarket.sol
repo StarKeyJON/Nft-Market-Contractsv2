@@ -143,10 +143,6 @@ contract NFTMarket is ReentrancyGuard, Pausable {
   bytes32 public constant TRADES = keccak256("TRADES");
 
   bytes32 public constant NFTADD = keccak256("NFT");
-  address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
-
-  bytes32 public constant MINT = keccak256("MINT");
-  address mintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
 
   /*~~~> Upgradable fee <~~~*/
   uint fee;
@@ -364,6 +360,7 @@ contract NFTMarket is ReentrancyGuard, Pausable {
     address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
     address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
     address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
 
     uint balance = IERC721(mrktNft).balanceOf(msg.sender);
     uint prices=0;

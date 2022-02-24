@@ -263,7 +263,7 @@ contract NFTMarket is ReentrancyGuard, Pausable {
     uint tokenLen = tokenId.length;
     for (uint i;i<tokenLen;i++){
         require(Collections(collsAdd).fetchCollection(nftContract[i]) == false);
-        require(price[i] > 0);
+        require(price[i] > 1e14);
         uint itemId;
         uint len = openStorage.length;
         if (len>=1){

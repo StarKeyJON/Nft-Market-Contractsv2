@@ -379,21 +379,23 @@ contract MarketOffers is ReentrancyGuard, Pausable {
     bool[] memory is1155
   ) public nonReentrant returns(bool){
 
-    address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
     address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
     address mrktAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
 
-    uint balance = IERC721(mrktNft).balanceOf(msg.sender);
+    uint balance = IERC721(RoleProvider(roleAdd).fetchAddress(NFTADD)).balanceOf(msg.sender);
     for (uint i; i<blindOfferId.length;i++){
       BlindOffer memory offer = idToBlindOffer[blindOfferId[i]];
       IERC20 tokenContract = IERC20(offer.tokenCont);
       if(balance<1){
+        /// Calculate fee and send to rewards contract
         uint256 _fee = calcFee(offer.amount);
-
-        Rewards(rewardsAdd).depositDAOERC20Rewards(_fee, offer.tokenCont);    
-        (tokenContract).transfer(payable(offer.offerer), offer.amount.sub(_fee));
+        uint256 userAmnt = offer.amount.sub(_fee);
+        /// send (_fee) to rewards contract
+        Rewards(rewardsAdd).depositERC20Rewards(_fee, offer.tokenCont);
+         /// send (offerAmount - _fee) to user  
+        (tokenContract).transfer(payable(msg.sender), userAmnt);
       } else {
-        (tokenContract).transfer(payable(offer.offerer), offer.amount);
+        (tokenContract).transfer(payable(msg.sender), offer.amount);
       }
       if(offer.isSpecific){
         require(tokenId[i]==offer.tokenId,"Wrong item!");
@@ -436,31 +438,24 @@ contract MarketOffers is ReentrancyGuard, Pausable {
       if (msg.sender != offer.seller) revert();
       IERC20 tokenContract = IERC20(offer.tokenCont);
       if(balance<1){
-
+        /// Calculate fee and send to rewards contract
         uint256 _fee = calcFee(offer.amount);
-        uint256 split = _fee.div(3);
-        (tokenContract).transfer(payable(rewardsAdd), _fee.sub(split));
-
-        Rewards(rewardsAdd).depositERC20Rewards(_fee.sub(split), offer.tokenCont);
-
-        Rewards(rewardsAdd).depositDAOERC20Rewards(split, offer.tokenCont);
-
-        (tokenContract).transfer(payable(offer.offerer), offer.amount.sub(_fee));
+        uint256 userAmnt = offer.amount.sub(_fee);
+        Rewards(rewardsAdd).depositERC20Rewards(_fee, offer.tokenCont);
+        (tokenContract).transfer(payable(offer.seller), userAmnt);
       } else {
-        (tokenContract).transfer(payable(offer.offerer), offer.amount);
+        (tokenContract).transfer(payable(offer.seller), offer.amount);
       }
-      uint bidId = Bids(bidsAdd).fetchBidId(offer.itemId);
-      if (bidId > 0) {
+      if (Bids(bidsAdd).fetchBidId(offer.itemId) > 0) {
       /*~~~> Kill bid and refund bidValue <~~~*/
         //~~~> Call the contract to refund the ETH offered for a bid
-        Bids(bidsAdd).refundBid(bidId);
+        Bids(bidsAdd).refundBid(Bids(bidsAdd).fetchBidId(offer.itemId));
       }
       /*~~~> Check for the case where there is an offer and refund it. <~~~*/
-      uint tradeId = Trades(tradesAdd).fetchTradeId(offer.itemId);
-      if (tradeId > 0) {
+      if (Trades(tradesAdd).fetchTradeId(offer.itemId) > 0) {
       /*~~~> Kill offer and refund amount <~~~*/
         //*~~~> Call the contract to refund the ERC20 offered for trade
-        Trades(tradesAdd).refundTrade(offer.itemId, tradeId);
+        Trades(tradesAdd).refundTrade(offer.itemId, Trades(tradesAdd).fetchTradeId(offer.itemId));
       }
       marketIdToOfferId[offer.itemId] = 0;
       openStorage.push(offerId[i]);
@@ -489,10 +484,11 @@ contract MarketOffers is ReentrancyGuard, Pausable {
     for (uint i; i< offerId.length; i++) {
     if (isBlind[i]){
       BlindOffer memory offer = idToBlindOffer[offerId[i]];
-      //*~~~> Require the message sender to be the offerer
+      ///*~~~> Require the message sender to be the offerer
       if (offer.offerer != msg.sender) revert();
       IERC20 tokenContract = IERC20(offer.tokenCont);
       (tokenContract).transfer(payable(offer.offerer), offer.amount);
+      /// push old offerId to blind open storage
       blindOpenStorage.push(offerId[i]);
       idToBlindOffer[offerId[i]] = BlindOffer(false, 0, 0, offerId[i], 0, address(0x0), address(0x0), payable(0x0));
       emit BlindOfferWithdrawn(
@@ -502,9 +498,11 @@ contract MarketOffers is ReentrancyGuard, Pausable {
       Offer memory offer = idToMktOffer[offerId[i]];
       if (offer.offerer != msg.sender) revert();
       IERC20 tokenContract = IERC20(offer.tokenCont);
-      openStorage.push(offerId[i]);
-      marketIdToOfferId[offer.itemId] = 0;
       (tokenContract).transfer(payable(offer.offerer), offer.amount);
+      /// push old offerId to open storage
+      openStorage.push(offerId[i]);
+      /// reset offerId
+      marketIdToOfferId[offer.itemId] = 0;
       idToMktOffer[offerId[i]] = Offer(false, offerId[i], 0, 0, address(0x0), payable(0x0), address(0x0));
       emit OfferWithdrawn(
         offerId[i], 
@@ -525,31 +523,18 @@ contract MarketOffers is ReentrancyGuard, Pausable {
     offerId: Internal storage Id of the offer
   <~~~*/
   function refundOffer(uint itemId, uint offerId) public nonReentrant hasContractAdmin returns(bool){
-      uint len = _offerIds.current();
-      for(uint i; i< len; i++){
-        Offer memory _offer = idToMktOffer[i+1];
-        if (_offer.itemId==itemId){
-          IERC20 tokenContract = IERC20(_offer.tokenCont);
-          (tokenContract).transfer(payable(_offer.offerer), _offer.amount);
-          openStorage.push(offerId);
-          marketIdToOfferId[_offer.itemId] = 0;
-          idToMktOffer[offerId] = Offer(false, offerId, 0, 0, address(0x0), payable(address(0x0)), address(0x0));
-          emit OfferRefunded(offerId, itemId, _offer.offerer);
-        }
-      }
+      Offer memory _offer = idToMktOffer[itemId];
+      /// verifying that the refunded offer is the correct one
+      require(_offer.offerId == offerId);
+      IERC20 tokenContract = IERC20(_offer.tokenCont);
+      (tokenContract).transfer(payable(_offer.offerer), _offer.amount);
+      /// recycle old offerId
+      openStorage.push(offerId);
+      /// reset internal memory of itemId
+      marketIdToOfferId[itemId] = 0;
+      idToMktOffer[offerId] = Offer(false, offerId, 0, 0, address(0x0), payable(address(0x0)), address(0x0));
+      emit OfferRefunded(offerId, itemId, _offer.offerer);
     return true;
-  }
-
-  function fetchOffers() public view returns (Offer[] memory) {
-    uint itemCount = _offerIds.current();
-    Offer[] memory items = new Offer[](itemCount);
-    for (uint i; i < itemCount; i++) {
-      if (idToMktOffer[i + 1].isActive == true) {
-        Offer storage currentItem = idToMktOffer[i + 1];
-        items[i] = currentItem;
-      }
-    }
-    return items;
   }
 
   /// @notice 
@@ -605,6 +590,19 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
     }
 
   ///@notice //*~~~> Public read function of internal state
+  function fetchOffers() public view returns (Offer[] memory) {
+    uint itemCount = _offerIds.current();
+    Offer[] memory items = new Offer[](itemCount);
+    for (uint i; i < itemCount; i++) {
+      if (idToMktOffer[i + 1].isActive == true) {
+        Offer storage currentItem = idToMktOffer[i + 1];
+        items[i] = currentItem;
+      }
+    }
+  return items;
+  }
+
+  ///@notice //*~~~> Public read function of internal state
   function fetchOffersByItemId(uint itemId) public view returns (Offer[] memory) {
     uint itemCount = _offerIds.current();
     Offer[] memory items = new Offer[](itemCount);
@@ -629,6 +627,16 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
           items[i] = currentItem;
         }
       }
+    }
+  return items;
+  }
+
+  function fetchBlindOffers() public view returns (BlindOffer[] memory) {
+    uint itemCount = _blindOfferIds.current();
+    BlindOffer[] memory items = new BlindOffer[](itemCount);
+    for (uint i; i < itemCount; i++) {
+      BlindOffer storage currentItem = idToBlindOffer[i + 1];
+      items[i] = currentItem;
     }
   return items;
   }

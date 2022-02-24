@@ -63,6 +63,11 @@ contract MarketRoleProvider is AccessControl {
     _;
   }
 
+  function setAddressGivenBytes(bytes32 key, address _sig) public hasAdmin returns(bool) {
+    marketBytes[key] = _sig;
+    return true;
+  }
+
   function setMarketAdd(address _mrktAdd) hasAdmin public returns(bool){
     marketplaceAdd = _mrktAdd;
     marketBytes[MARKET]= _mrktAdd;

@@ -62,6 +62,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
 /*~~~>
 Interface declarations for upgradable contracts
@@ -82,6 +83,7 @@ interface IERC20 {
 }
 interface RoleProvider {
   function hasTheRole(bytes32 role, address _address) external returns(bool);
+  function fetchAddress(bytes32 _var) external returns(address);
 }
 interface Bids {
   function fetchBidId(uint marketId) external returns(uint);
@@ -95,7 +97,7 @@ interface Collections {
   function fetchCollection(address nftContract) external returns(bool);
 }
 
-contract MarketOffers is ReentrancyGuard {
+contract MarketOffers is ReentrancyGuard, Pausable {
   using SafeMath for uint;
   using Counters for Counters.Counter;
   //*~~~> counter increments NFTs Offers
@@ -107,7 +109,7 @@ contract MarketOffers is ReentrancyGuard {
   //*~~~> Roles for designated accessibility
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
   bytes32 public constant CONTRACT_ROLE = keccak256("CONTRACT_ROLE");
-  
+  bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE");
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
     _;
@@ -116,19 +118,40 @@ contract MarketOffers is ReentrancyGuard {
     require(RoleProvider(roleAdd).hasTheRole(CONTRACT_ROLE, msg.sender), "DOES NOT HAVE CONTRACT ROLE");
     _;
   }
+  modifier hasDevAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), "DOES NOT HAVE DEV ROLE");
+    _;
+  }
 
+  //*~~~> State variables
   address public roleAdd;
-  address public controlAdd;
-  address public rewardsAdd;
-  address public mrktAdd;
-  address public mrktNft;
-  address public bidsAdd;
-  address public tradesAdd;
-  address public mintAdd;
-  address public collsAdd;
   uint public fee;
   uint[] private openStorage;
   uint[] private blindOpenStorage;
+
+  //*~~~> global address variable from Role Provider contract
+  bytes32 public constant NFTADD = keccak256("NFT");
+  address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
+
+  bytes32 public constant REWARDS = keccak256("REWARDS");
+  address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
+
+  bytes32 public constant MARKET = keccak256("MARKET");
+  address mrktAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+
+  bytes32 public constant BIDS = keccak256("BIDS");
+  address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+  
+  bytes32 public constant TRADES = keccak256("TRADES");
+  address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
+
+  bytes32 public constant MINT = keccak256("MINT");
+  address mintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
+
+  bytes32 public constant COLLECTION = keccak256("COLLECTION");
+  address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+
+
 
   //*~~~> sets deployment address as default admin role
   constructor(address _role, address _mrktAdd, address _mintAdd) {
@@ -216,42 +239,6 @@ contract MarketOffers is ReentrancyGuard {
   );
 
   /*~~~> Allowing for upgradability of proxy addresses <~~~*/
-  function setMrktAdd(address _mrktAdd) public hasAdmin returns(bool){
-    mrktAdd = _mrktAdd;
-    return true;
-  }
-  function setMrktNFTAdd(address _mrktNft) public hasAdmin returns(bool){
-    mrktNft = _mrktNft;
-    return true;
-  }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAdd = _contAdd;
-    return true;
-  }
-  function setRwdsAdd(address _rwdsAdd) public hasAdmin returns(bool){
-    rewardsAdd = _rwdsAdd;
-    return true;
-  }
-  function setMarketMintAdd(address _newAdd) public hasAdmin returns(bool){
-    mintAdd = _newAdd;
-    return true;
-  }
-  function setBidAdd(address _bid) public hasAdmin returns(bool) {
-    bidsAdd = _bid;
-    return true;
-  }
-  function setTradesAdd(address _trade) public hasAdmin returns(bool) {
-    tradesAdd = _trade;
-    return true;
-  }
-  function setCollAdd(address _coll) public hasAdmin returns(bool) {
-    collsAdd = _coll;
-    return true;
-  }
-  function setRoleAdd(address _role) public hasAdmin returns(bool){
-    roleAdd = _role;
-    return true;
-  }
   function setFee(uint _fee) public hasAdmin returns (bool) {
     fee = _fee;
     return true;
@@ -299,7 +286,7 @@ contract MarketOffers is ReentrancyGuard {
       uint len = openStorage.length;
       if (len>=1) {
         offerId = openStorage[len-1];
-        _remove(len-1, 0);
+        _remove(0);
       } else {
         _offerIds.increment();
         offerId = _offerIds.current();
@@ -348,7 +335,7 @@ contract MarketOffers is ReentrancyGuard {
       uint len = blindOpenStorage.length;
       if (len>=1) {
         offerId = blindOpenStorage[len-1];
-        _remove(len-1, 1);
+        _remove(1);
       } else {
         _blindOfferIds.increment();
         offerId = _blindOfferIds.current();
@@ -596,13 +583,7 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
         We use the last item in the storage (length of array - 1),
         in order to pop off the item and avoid rewriting 
   <~~~*/
-  /// @dev
-    /*~~~>
-      _index: index of the id to be removed;
-      store: if regular bid (0) else if blind offer (1)
-    <~~~*/
-  function _remove(uint _index, uint store) internal {
-      require(_index < openStorage.length, "index out of bound");
+  function _remove(uint store) internal {
       if (store==0){
         openStorage.pop();
       } else if (store==1){
@@ -656,11 +637,19 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
     return _id;
   }
 
+  ///@notice DEV operations for emergency functions
+  function pause() public hasDevAdmin {
+      _pause();
+  }
+  function unpause() public hasDevAdmin {
+      _unpause();
+  }
+
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 }

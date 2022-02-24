@@ -73,14 +73,16 @@ contract ERC721Factory {
 
   //*~~~> Declaring object structures for NFTs and NFT contracts
   struct NFTContract {
-      bool is1155;
-      uint itemId;
-      address creator;
+    bool is1155;
+    uint itemId;
+    address creator;
   }
 
   constructor(address _role){
     roleAdd = _role;
   }
+
+  address public roleAdd;
 
   //*~~~> Memory array of all NFT contracts created
   mapping (uint256 => NFTContract) private _idToNftContract;
@@ -88,12 +90,14 @@ contract ERC721Factory {
   /*~~~>
     Roles for designated accessibility
   <~~~*/
-  address roleAdd;
-  address controlAdd;
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
-  
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
+    _;
+  }
+  bytes32 public constant CONTRACT_ROLE = keccak256("CONTRACT_ROLE");
+  modifier hasContractAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(CONTRACT_ROLE, msg.sender), "DOES NOT HAVE CONTRACT ROLE");
     _;
   }
   // *~~~> Events declared for listeners
@@ -101,10 +105,6 @@ contract ERC721Factory {
 
   function setRoleAdd(address _role) public hasAdmin returns(bool){
     roleAdd = _role;
-    return true;
-  }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAdd = _contAdd;
     return true;
   }
 
@@ -117,7 +117,7 @@ contract ERC721Factory {
     string calldata name: name of the contract;
     string calldata symbol: symbol of the token;
   <~~~*/
-  function newNftContract(address controller, address minter, string calldata name, string calldata symbol) hasAdmin public payable returns(bool) {
+  function newNftContract(address controller, address minter, string calldata name, string calldata symbol) hasContractAdmin public payable returns(bool) {
     PhamNFTs c = new PhamNFTs(controller, minter, name, symbol);
     _nftContractsCreated.increment();
     uint256 nftId = _nftContractsCreated.current();
@@ -147,10 +147,10 @@ contract ERC721Factory {
   Fallback functions
   <~~~*/
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 }

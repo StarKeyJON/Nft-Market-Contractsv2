@@ -58,6 +58,7 @@
 pragma solidity  >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
 ///@notice
 /*~~~>
@@ -110,6 +111,7 @@ interface RoleProvider {
   function setFactoryAdd(address _erc721) external returns(bool);
   function set1155FactoryAdd(address _erc1155) external returns(bool);
   function setPhunkyAdd(address _phunky) external returns(bool);
+  function setDevSigAddress(address _sig) external returns(bool);
   function hasTheRole(bytes32 role, address _address) external returns(bool);
   function grantRole(bytes32 role, address _address) external;
   function revokeRole(bytes32 role, address account) external;
@@ -119,47 +121,34 @@ interface Rewards {
   function setAccountRcv(address _recvr) external;
 }
 
-contract OwnerProxy is ReentrancyGuard {
+contract OwnerProxy is ReentrancyGuard, Pausable {
   /*~~~>
     State Address Variables
   <~~~*/
   //*~~~> global address variable from Role Provider contract
   bytes32 public constant REWARDS = keccak256("REWARDS");
-  address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
 
   bytes32 public constant COLLECTION = keccak256("COLLECTION");
-  address collectionsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
   
   bytes32 public constant BIDS = keccak256("BIDS");
-  address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
   
   bytes32 public constant OFFERS = keccak256("OFFERS");
-  address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
   
   bytes32 public constant TRADES = keccak256("TRADES");
-  address tradesAdd = RoleProvider(roleAdd).fetchAddress(TRADES);
 
   bytes32 public constant NFTADD = keccak256("NFT");
-  address nftAdd = RoleProvider(roleAdd).fetchAddress(NFTADD);
 
   bytes32 public constant MINT = keccak256("MINT");
-  address marketMintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
 
   bytes32 public constant MARKET = keccak256("MARKET");
-  address marketPlaceAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
 
   bytes32 public constant PROXY = keccak256("PROXY");
-  address controlAdd = RoleProvider(roleAdd).fetchAddress(PROXY);
 
   bytes32 public constant ERC721FACTORY = keccak256("ERC721FACTORY");
-  address erc721FactoryAdd = RoleProvider(roleAdd).fetchAddress(ERC721FACTORY);
 
   bytes32 public constant ERC1155FACTORY = keccak256("ERC1155FACTORY");
-  address erc1155FactoryAdd = RoleProvider(roleAdd).fetchAddress(ERC1155FACTORY);
 
   bytes32 public constant DEV = keccak256("DEV");
-  address devAdd = RoleProvider(roleAdd).fetchAddress(DEV);
-
 
   address public roleAdd;
 
@@ -183,6 +172,10 @@ contract OwnerProxy is ReentrancyGuard {
     For setting fees on Bids, Offers, MarketMint and Marketplace
   <~~~*/
   function setFees(uint _fee) hasAdmin public returns(bool){
+    address marketPlaceAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+    address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+    address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+    address marketMintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
     Offers(offersAdd).setFee(_fee);
     Bids(bidsAdd).setFee(_fee);
     MarketMint(marketMintAdd).setFee(_fee);
@@ -194,79 +187,52 @@ contract OwnerProxy is ReentrancyGuard {
   /*~~~>
     For setting the state address variables
   <~~~*/
-  function addressInit(address _mrktAdd, address _nft, address _mintAdd, address _collAdd, address _offAdd, address _tradAdd, address _bidsAdd, address _rwdsAdd, address _erc721, address _erc1155) public nonReentrant hasAdmin returns(bool){
-    marketPlaceAdd = _mrktAdd;
-    nftAdd = _nft;
-    marketMintAdd = _mintAdd;
-    collectionsAdd = _collAdd;
-    offersAdd = _offAdd;
-    tradesAdd = _tradAdd;
-    bidsAdd = _bidsAdd;
-    rewardsAdd = _rwdsAdd;
-    erc721FactoryAdd = _erc721;
-    erc1155FactoryAdd = _erc1155;
-    return true;
-  }
-  function setControlAdd() public nonReentrant hasAdmin returns(bool){
-    return true;
-  }
   function setMarketAdd(address _mrktAdd) hasAdmin public returns(bool){
-    marketPlaceAdd = _mrktAdd;
     RoleProvider(roleAdd).setMarketAdd(_mrktAdd);
     return true;
   }
   function setNftAdd(address _nft) hasAdmin public returns(bool){
-    nftAdd = _nft;
     RoleProvider(roleAdd).setNftAdd(_nft);
     return true;
   }
   function setMarketMintAdd(address _mintAdd) hasAdmin public returns(bool){
-    marketMintAdd = _mintAdd;
     RoleProvider(roleAdd).setMarketMintAdd(_mintAdd);
     return true;
   }
    function setCollectionsAdd(address _collAdd) hasAdmin public returns(bool){
-    collectionsAdd = _collAdd;
     RoleProvider(roleAdd).setCollectionsAdd(_collAdd);
     return true;
   }
   function setOffersAdd(address _offAdd) hasAdmin public returns(bool){
-    offersAdd = _offAdd;
     RoleProvider(roleAdd).setOffersAdd(_offAdd);
     return true;
   }
   function setTradesAdd(address _tradAdd) hasAdmin public returns(bool){
-    tradesAdd = _tradAdd;
     RoleProvider(roleAdd).setTradesAdd(_tradAdd);
     return true;
   }
   function setBidsAdd(address _bidsAdd) hasAdmin public returns(bool){
-    bidsAdd = _bidsAdd;
     RoleProvider(roleAdd).setBidsAdd(_bidsAdd);
     return true;
   }
   function setRwdsAdd(address _rwdsAdd) hasAdmin public returns(bool){
-    rewardsAdd = _rwdsAdd;
     RoleProvider(roleAdd).setRwdsAdd(_rwdsAdd);
     return true;
   }
   function setRoleAdd(address _role) public hasAdmin returns(bool){
-    roleAdd = _role;
+      roleAdd = _role;
     return true;
   }
   function setFactoryAdd(address _erc721) public hasAdmin returns(bool){
-    erc721FactoryAdd = _erc721;
     RoleProvider(roleAdd).setFactoryAdd(_erc721);
     return true;
   }
   function set1155FactoryAdd(address _erc1155) public hasAdmin returns(bool){
-    erc1155FactoryAdd = _erc1155;
     RoleProvider(roleAdd).set1155FactoryAdd(_erc1155);
     return true;
   }
   function setDevAdd(address _devAdd) public hasDevAdmin returns(bool){
-    devAdd = _devAdd;
-    RoleProvider(roleAdd).set1155FactoryAdd(_devAdd);
+    RoleProvider(roleAdd).setDevSigAddress(_devAdd);
     return true;
   }
 
@@ -294,6 +260,7 @@ contract OwnerProxy is ReentrancyGuard {
     For setting the DAO address to withdraw rewards
   <~~~*/
   function setRewardsAccountRcv(address _recvr) hasAdmin public returns(bool){
+    address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
     Rewards(rewardsAdd).setAccountRcv(_recvr);
     return true;
   }
@@ -306,11 +273,13 @@ contract OwnerProxy is ReentrancyGuard {
   string[] calldata name,
   address[] calldata nftContract 
   ) hasAdmin public returns(bool){
+    address collectionsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
     Collections(collectionsAdd).restrictMarketCollection(name, nftContract);
     return true;
   }
 
   function editMarketCollection(bool[] calldata isNotTradable, string[] calldata name, address[] calldata nftContract, uint[] calldata collectionId) hasAdmin public returns(bool){
+    address collectionsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
     Collections(collectionsAdd).editMarketCollection(isNotTradable, name, nftContract, collectionId);
     return true;
   }
@@ -320,14 +289,17 @@ contract OwnerProxy is ReentrancyGuard {
   For controlling MarketMint contract
   <~~~*/
   function setNewMintRedemption(uint amount, address _toke) hasAdmin public returns(bool){
+    address marketMintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
     MarketMint(marketMintAdd).setNewRedemption(amount, _toke);
     return true;
   }
   function setMintRedemptionToken(uint64 _redeemAmount, address _contract) hasAdmin public returns(bool){
+    address marketMintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
     MarketMint(marketMintAdd).setRedemptionToken(_redeemAmount, _contract);
     return true;
   }
   function setMintDeployAmnt(uint dplyAmnt) hasAdmin public returns(bool){
+    address marketMintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
     MarketMint(marketMintAdd).setDeployAmnt(dplyAmnt);
     return true;
   }
@@ -337,12 +309,22 @@ contract OwnerProxy is ReentrancyGuard {
     For controlling the NFT contract accessibility roles after initial deployment
   <~~~*/
   function grantNFTRoles(bytes32 role, address account) hasAdmin public returns(bool) {
+    address nftAdd = RoleProvider(roleAdd).fetchAddress(NFTADD);
     NFT(nftAdd).grantRole(role, account);
     return true;
   }
   function revokeNFTRoles(bytes32 role, address account) hasAdmin public returns(bool) {
+    address nftAdd = RoleProvider(roleAdd).fetchAddress(NFTADD);
     NFT(nftAdd).revokeRole(role, account);
     return true;
+  }
+
+  ///@notice DEV operations for emergency functions
+  function pause() public hasDevAdmin {
+      _pause();
+  }
+  function unpause() public hasDevAdmin {
+      _unpause();
   }
 
   /*~~~>

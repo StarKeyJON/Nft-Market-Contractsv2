@@ -144,8 +144,6 @@ contract MarketOffers is ReentrancyGuard, Pausable {
   bytes32 public constant MINT = keccak256("MINT");
 
   bytes32 public constant COLLECTION = keccak256("COLLECTION");
-  address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
-
 
 
   //*~~~> sets deployment address as default admin role
@@ -271,6 +269,9 @@ contract MarketOffers is ReentrancyGuard, Pausable {
     address[] memory tokenCont,
     address[] memory seller
   ) public nonReentrant returns(bool){
+
+    address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+
       for (uint i; i< itemId.length; i++) {
       require(Collections(collsAdd).canOfferToken(tokenCont[i]),"Unknown token!");
       require (amount[i] > 0,"Amount needs to be > 0");
@@ -323,6 +324,8 @@ contract MarketOffers is ReentrancyGuard, Pausable {
     address[] memory collection
   ) public nonReentrant{
     for (uint i; i<tokenCont.length;i++){
+      
+      address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
 
       uint256 allowance = IERC20(tokenCont[i]).allowance(msg.sender, address(this));
       require(allowance >= amount[i], "Check the token allowance");
@@ -437,7 +440,7 @@ contract MarketOffers is ReentrancyGuard, Pausable {
         uint256 _fee = calcFee(offer.amount);
         uint256 split = _fee.div(3);
         (tokenContract).transfer(payable(rewardsAdd), _fee.sub(split));
-        
+
         Rewards(rewardsAdd).depositERC20Rewards(_fee.sub(split), offer.tokenCont);
 
         Rewards(rewardsAdd).depositDAOERC20Rewards(split, offer.tokenCont);

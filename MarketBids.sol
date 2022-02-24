@@ -334,7 +334,7 @@ contract MarketBids is ReentrancyGuard, Pausable {
     address collectionAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
     
     for (uint i;i<bidAddress.length;i++){
-      require(value[i]>1, "Must be greater than 1 gwei.");
+      require(value[i] > 1e12, "Must be greater than 1e12 gwei.");
       require(Collections(collectionAdd).fetchCollection(bidAddress[i]) == false);
       uint bidId;
       uint len = blindOpenStorage.length;
@@ -391,11 +391,11 @@ contract MarketBids is ReentrancyGuard, Pausable {
         if(balance<1){
           /*~~~> Calculating the platform fee <~~~*/
           uint256 _fee = calcFee(bid.bidValue);
-          uint256 split = _fee.div(3);
-          uint256 treasure = _fee.sub(split);
-          RewardsController(rewardsAdd).splitRewards{value: split}(split);
-          RewardsController(rewardsAdd).depositEthToDAO{value: treasure}();
-          payable(msg.sender).transfer(bid.bidValue.sub(_fee));
+          uint256 _userAmnt = bid.bidValue.sub(_fee);
+          /// send fee to rewards controller
+          RewardsController(rewardsAdd).splitRewards{value: _fee}(_fee);
+          /// send (bidValue - fee) to user
+          payable(msg.sender).transfer(_userAmnt);
         } else {
           payable(msg.sender).transfer(bid.bidValue);
         }
@@ -416,7 +416,7 @@ contract MarketBids is ReentrancyGuard, Pausable {
           NFTMkt(marketAdd).transferNftForSale(bid.bidder, listedId[i]);
         }
       }
-        blindOpenStorage.push(blindBidId[i]);
+      blindOpenStorage.push(blindBidId[i]);
       idToBlindBid[blindBidId[i]] = BlindBid(false, 0, blindBidId[i], 0, 0, address(0x0), address(0x0));
       emit BlindBidAccepted(tokenId[i], blindBidId[i], bid.bidValue, bid.bidder, msg.sender);
     }
@@ -445,15 +445,15 @@ contract MarketBids is ReentrancyGuard, Pausable {
       Bid memory bid = idToNftBid[bidId[i]];
       require(msg.sender == bid.seller);
       if(balance<1) {
-        /*~~~> Calculating the platform fee <~~~*/
-        uint256 _fee = calcFee(bid.bidValue);
-        uint256 split = _fee.div(3);
-        uint256 treasure = _fee.sub(split);
-        RewardsController(rewardsAdd).splitRewards{value: split}(split);
-        RewardsController(rewardsAdd).depositEthToDAO{value: treasure}();
-        payable(msg.sender).transfer(bid.bidValue.sub(_fee));
+          /*~~~> Calculating the platform fee <~~~*/
+          uint256 _fee = calcFee(bid.bidValue);
+          uint256 _userAmnt = bid.bidValue.sub(_fee);
+          /// send fee to rewards controller
+          RewardsController(rewardsAdd).splitRewards{value: _fee}(_fee);
+          /// send (bidValue - fee) to user
+          payable(bid.seller).transfer(_userAmnt);
       } else {
-        payable(msg.sender).transfer(bid.bidValue);
+        payable(bid.seller).transfer(bid.bidValue);
       }
       /*~~~> Check for the case where there is a trade and refund it. <~~~*/
       uint offerId = Offers(offersAdd).fetchOfferId(bid.itemId);
@@ -492,7 +492,7 @@ contract MarketBids is ReentrancyGuard, Pausable {
         if (bid.bidder != msg.sender) revert();
         payable(bid.bidder).transfer(bid.bidValue);
         blindOpenStorage.push(bidId[i]);
-        idToBlindBid[bidId[i]] = BlindBid(false, 0, 0, 0, 0, (address(0x0)), payable(address(0x0)));
+        idToBlindBid[bidId[i]] = BlindBid(false, 0, bid.bidId, 0, 0, (address(0x0)), payable(address(0x0)));
         emit BlindBidWithdrawn(bidId[i], msg.sender);
       } else {
         Bid memory bid = idToNftBid[bidId[i]];

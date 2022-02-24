@@ -108,7 +108,7 @@ interface RoleProvider {
   function setRwdsAdd(address _rwdsAdd) external returns(bool);
   function setRoleAdd(address _role) external returns(bool);
   function setOwnerProxyAdd(address _proxyAdd) external returns(bool);
-  function setFactoryAdd(address _erc721) external returns(bool);
+  function set721FactoryAdd(address _erc721) external returns(bool);
   function set1155FactoryAdd(address _erc1155) external returns(bool);
   function setPhunkyAdd(address _phunky) external returns(bool);
   function setDevSigAddress(address _sig) external returns(bool);
@@ -167,9 +167,10 @@ contract OwnerProxy is ReentrancyGuard, Pausable {
   constructor(address _role){
     roleAdd = _role;
   }
+
   /// @notice
   /*~~~>
-    For setting fees on Bids, Offers, MarketMint and Marketplace
+    For setting fees on Bids, Offers, MarketMint and Marketplace contracts
   <~~~*/
   function setFees(uint _fee) hasAdmin public returns(bool){
     address marketPlaceAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
@@ -223,8 +224,8 @@ contract OwnerProxy is ReentrancyGuard, Pausable {
       roleAdd = _role;
     return true;
   }
-  function setFactoryAdd(address _erc721) public hasAdmin returns(bool){
-    RoleProvider(roleAdd).setFactoryAdd(_erc721);
+  function set721FactoryAdd(address _erc721) public hasAdmin returns(bool){
+    RoleProvider(roleAdd).set721FactoryAdd(_erc721);
     return true;
   }
   function set1155FactoryAdd(address _erc1155) public hasAdmin returns(bool){

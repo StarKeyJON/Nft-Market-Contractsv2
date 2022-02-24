@@ -63,41 +63,40 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
 interface RoleProvider {
   function hasTheRole(bytes32 role, address _address) external returns(bool);
+  function fetchAddress(bytes32 _var) external returns(address);
 }
-interface Treasury {
+interface MarketMint {
   function fetch1155NFTContractsCreated() external returns(uint);
 }
 
-contract RewardsControl is ReentrancyGuard {
+contract RewardsControl is ReentrancyGuard, Pausable {
   using SafeMath for uint;
   using Counters for Counters.Counter;
 
-  /*~~~>
-    Roles for designated accessibility
-  <~~~*/
-  bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
-
   /*~~~> 
-    Accounts receivable for unclaimed fees;
-    Goes towards the Developers fund;
+    amount receivable for PHUNKY DAO;
   <~~~*/
   uint amountReceivable;
   uint[] tokenAmount;
   address[] tokenAddresses;
 
-  //*~~~> Developers fund!
+  //*~~~> Addresses!
   address private devSig;
+  address roleAdd;
 
   //*~~~> Split is amount of ETH to split between users;
   uint split;
 
   //*~~~> upgradable proxy contract addresses
-  address public NFTadd;
-  address public trsryAdd;
-  address public controlAdd;
+  bytes32 public constant NFTADD = keccak256("NFT");
+  address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
+
+  bytes32 public constant MINT = keccak256("MINT");
+  address mintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
 
   /*~~~> Open storage indexes <~~~*/
   uint[] private openStorage;
@@ -107,21 +106,16 @@ contract RewardsControl is ReentrancyGuard {
   Counters.Counter private _users;
   Counters.Counter private _tokens;
 
-  /*~~~> Mapping 
-    id to User, 
-    id to Tokens,
-    user address to id
-    token address to id
-     <~~~*/
-  mapping(uint256 => User) private idToUser; //Internal index
-  mapping(uint256 => User) private nftIdToUser; // Tracking NFTs as users to limit claims
+  mapping(uint256 => User) private idToUser; //Internal index => User
+  mapping(uint256 => User) private nftIdToUser; // Tracking NFT ids => User, to limit claims
   mapping(address => User) private addressToUser;
   mapping(address => uint) private addressToId; //For user Id
   mapping(address => uint) private addressToTokenId; // For token Id
   mapping(uint256 => Token) private idToTokens;
   mapping(uint256 => Dev) private idToDev;
   mapping(address => uint) private addressToDevId;
-  /*~~~> sets deployment address as default admin role <~~~*/
+  mapping(uint => ClaimClock) private idToClock;
+
   constructor(address _role, address devPhund) {
     roleAdd = _role;
     devSig = devPhund;
@@ -130,6 +124,7 @@ contract RewardsControl is ReentrancyGuard {
   //*~~~> Declaring object structures for User Rewards & Tokens <~~~*/
   struct User {
     bool canClaim;
+    uint claims;
     uint timestamp;
     uint userId;
     address userAddress;
@@ -144,11 +139,25 @@ contract RewardsControl is ReentrancyGuard {
     uint tokenAmount;
     address tokenAddress;
   }
+  struct ClaimClock {
+    uint alpha; // initial claim cutoff
+    uint delta; // mid claim cutoff
+    uint omega; // final claim cutoff
+    uint howManyUsers; // total user count set with each distribution call
+  }
 
-  // Functinon modifier requiring admin accessibility
-  address roleAdd;
+  /*~~~>
+    Roles for designated accessibility
+  <~~~*/
+  bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
+  bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE"); 
+
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
+    _;
+  }
+  modifier hasDevAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), "DOES NOT HAVE DEV ROLE");
     _;
   }
 
@@ -157,27 +166,21 @@ contract RewardsControl is ReentrancyGuard {
     roleAdd = _role;
     return true;
   }
-  function setDevSigAddress(address _sig) public hasAdmin returns(bool){
-    devSig = _sig;
-    return true;
-  }
-  function setTreasuryAddress(address _trsy) public hasAdmin returns(bool){
-    trsryAdd = _trsy;
-    return true;
-  }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAdd = _contAdd;
+
+  function setMintAddress(address _mint) public hasAdmin returns(bool){
+    mintAdd = _mint;
     return true;
   }
 
   //*~~~> Declaring event structures
   event NewUser(uint indexed userId, address indexed userAddress);
+  event NewDistribution(uint indexed timestamp, uint userAmount);
   event RewardsClaimed(address indexed userAddress);
   event NewDev(address indexed devAddress);
   event RemovedDev(address indexed devAddress);
   event DevClaimed(address indexed devAddress);
+  event SetTime(uint indexed alpha, uint delta, uint omega, uint currentUserCount);
   event Received(address, uint);
-
 
   /// @notice
   /*~~~>
@@ -188,8 +191,7 @@ contract RewardsControl is ReentrancyGuard {
     devAddress: new dev;
   <~~~*/
   /// @return Bool
-  function addDev(address devAddress) public nonReentrant returns(bool) {
-    require(msg.sender==devSig,"NOT DEV MULTI_SIG");
+  function addDev(address devAddress) public hasDevAdmin nonReentrant returns(bool) {
     uint devLen = _devs.current();
     bool added;
     for (uint i; i<devLen;i++){
@@ -218,8 +220,7 @@ contract RewardsControl is ReentrancyGuard {
     devAddress: new dev;
   <~~~*/
   /// @return removed Bool
-  function removeDev(address devAddress) public nonReentrant returns(bool) {
-    require(msg.sender==devSig,"NOT DEV MULTI_SIG");
+  function removeDev(address devAddress) public hasDevAdmin nonReentrant returns(bool) {
     uint id = addressToDevId[devAddress];
     Dev memory _dev = idToDev[id];
     idToDev[id] = Dev(0, _dev.devIndex, address(0x0));
@@ -241,13 +242,23 @@ contract RewardsControl is ReentrancyGuard {
     uint len = openStorage.length;
     if (len>=1){
       userId=openStorage[len-1];
-      _remove(len-1);
+      _remove();
     } else {
       _users.increment();
       userId = _users.current();
     }
+    uint tokenlen = _tokens.current();
+    uint[] memory amnt;
+    address[] memory tokeAdd;
+    for (uint i; i < tokenlen; i++) {
+      Token memory toke = idToTokens[i+1];
+      tokeAdd[i] = toke.tokenAddress;
+      amnt[i] = 0;
+    }
     addressToId[userAddress] = userId;
-    idToUser[userId] = User(true, block.timestamp, userId, userAddress);
+    User memory user = User(true, 0, block.timestamp, userId, userAddress);
+    idToUser[userId] = user;
+    addressToUser[userAddress] = user; 
     emit NewUser(userId, userAddress);
     return true;
   }
@@ -263,53 +274,121 @@ contract RewardsControl is ReentrancyGuard {
     uint userId = addressToId[userAddress];
     User memory user = idToUser[userId];
     if (canTrade){
-      idToUser[userId] = User(true, user.timestamp, user.userId, address(0x0));
+      uint tokenlen = _tokens.current();
+      uint[] memory amnt;
+      address[] memory tokeAdd;
+      for (uint i; i < tokenlen; i++) {
+        Token memory toke = idToTokens[i+1];
+        tokeAdd[i] = toke.tokenAddress;
+        amnt[i] = 0;
+      }
+      idToUser[userId] = User(true, 0, user.timestamp, user.userId, address(0x0));
     } else {
       openStorage.push(userId);
       addressToId[userAddress] = 0;
-      idToUser[userId] = User(false, 0, 0, address(0x0));
+      uint tokenlen = _tokens.current();
+      uint[] memory amnt;
+      address[] memory tokeAdd;
+      for (uint i; i < tokenlen; i++) {
+        Token memory toke = idToTokens[i+1];
+        tokeAdd[i] = toke.tokenAddress;
+        amnt[i] = 0;
+      }
+      idToUser[userId] = User(false, 0, 0, 0,  address(0x0));
     }
-    
     return true;
+  }
+
+  /*~~~> Public function anyone can call to split the accumulated user rewards
+    When called, the current timestamp is saved as alpha time.
+    Old aplha time becomes delta,
+      old delta time becomes omega.
+    Total user count is saved.
+    Can only be called every 2 days.
+  <~~~*/
+  function setClaimClock() public nonReentrant {
+    uint users = fetchUserAmnt();
+    uint nfts = MarketMint(mintAdd).fetch1155NFTContractsCreated();
+    ClaimClock memory clock = idToClock[8];
+    require(clock.alpha < (block.timestamp - 2 days));
+    uint alpha = block.timestamp;
+    uint delta = clock.alpha;
+    uint omega = clock.delta;
+    uint totalUsers = users.add(nfts);
+    idToClock[8] = ClaimClock(alpha, delta, omega, totalUsers);
+    emit SetTime(alpha, delta, omega, totalUsers);
   }
 
   //*~~~> Claims all eligible rewards for user
   function claimRewards() public nonReentrant {
     uint id = addressToId[msg.sender];
     User memory user = idToUser[id];
+    ClaimClock memory clock = idToClock[8];
     require(user.canClaim==true,"Ineligible!");
-    //*~~~> Require 1 day to have passed since last claim
-    require(user.timestamp < (block.timestamp - 1 days));
-    uint throttle = 1;
-    if(user.timestamp > (block.timestamp - 3 days)){
-      //*~~~> If the user has claimed in the past 3 days, cut the claim in half
-      throttle = 2;
+    /*~~~> Distribute according to timestamp cutoff
+      if user.timestamp: 
+          > clock.alpha = no claims;
+          < clock.alpha > clock.delta && claims == 0 = full claim, else no claim;
+          < clock.delta > clock.omega && claims == 1 = 1/2 claim, else no claim;
+          < clock.omega && claims == 2 = 1/3 claim, else no claim;
+          claims == 3 no claims;
+    <~~~*/
+    ///*~~~> i.e. alpha: 100, delta: 98, omega:96
+      //*~~~> user.timestamp == 99, is less than alpha, greater than omega, 0 claims, gets rewards
+    if (user.timestamp < clock.alpha && user.timestamp > clock.delta){
+      if (user.claims==0){
+        uint userSplits = split.div(clock.howManyUsers);
+        payable(msg.sender).transfer(userSplits);
+        uint tokenLen = _tokens.current();
+        for (uint i; i < tokenLen; i++) {
+          Token memory toke = idToTokens[i+1];
+          uint ercSplit = (toke.tokenAmount.div(clock.howManyUsers));
+          IERC20(toke.tokenAddress).transfer(payable(msg.sender), ercSplit);
+          toke.tokenAmount = toke.tokenAmount.sub(ercSplit);
+        }
+        user.claims+=1;
+      }
     }
-    uint users = fetchUserAmnt();
-    uint nfts = Treasury(trsryAdd).fetch1155NFTContractsCreated();
-    uint totalUsers = users.add(nfts);
-    uint splits = split.div(totalUsers).div(throttle);
-    uint[] memory amnt;
-    payable(msg.sender).transfer(splits);
-    uint len = _tokens.current();
-    for (uint i; i < len; i++) {
-      Token memory toke = idToTokens[i+1];
-      uint ercSplit = (toke.tokenAmount.div(totalUsers)).div(throttle);
-      IERC20(toke.tokenAddress).transfer(payable(msg.sender), ercSplit);
-      amnt[i+1] = 0;
+    ///*~~~> i.e. alpha: 100, delta: 98, omega:96
+      //*~~~> user.timestamp == 97, is less than delta, greater than omega, 1 or less claims, gets 1/2 full rewards
+    if (user.timestamp < clock.delta && user.timestamp > clock.omega){
+      if(user.claims <= 1){
+        uint userSplits = split.div(clock.howManyUsers);
+        payable(msg.sender).transfer(userSplits.div(2));
+        uint tokenLen = _tokens.current();
+        for (uint i; i < tokenLen; i++) {
+          Token memory toke = idToTokens[i+1];
+          uint ercSplit = (toke.tokenAmount.div(clock.howManyUsers)).div(2);
+          IERC20(toke.tokenAddress).transfer(payable(msg.sender), ercSplit);
+          toke.tokenAmount = toke.tokenAmount.sub(ercSplit);
+        }
+        user.claims+=1;
+      }
     }
-    user = User(true, block.timestamp, id, user.userAddress);
-    emit RewardsClaimed(msg.sender);
+    ///*~~~> i.e. alpha: 100, delta: 98, omega:96
+      //*~~~> user.timestamp == 95, is less than omega, 2 or less claims, gets 1/3 full reward
+    if (user.timestamp < clock.omega && user.claims <= 2){
+      uint userSplits = split.div(clock.howManyUsers);
+      payable(msg.sender).transfer(userSplits.div(3));
+      uint tokenLen = _tokens.current();
+      for (uint i; i < tokenLen; i++) {
+        Token memory toke = idToTokens[i+1];
+        uint ercSplit = (toke.tokenAmount.div(clock.howManyUsers)).div(3);
+        IERC20(toke.tokenAddress).transfer(payable(msg.sender), ercSplit);
+        toke.tokenAmount = toke.tokenAmount.sub(ercSplit);
+      }
+      user.claims+=1;
+    }
   }
 
   //*~~~> Claims eligible rewards for NFT holders <~~~*//
   function claimNFTRewards(uint nftId) public nonReentrant {
-    require(IERC721(NFTadd).balanceOf(msg.sender)>0,"Ineligible!");
+    require(IERC721(mrktNft).balanceOf(msg.sender)>0,"Ineligible!");
     User memory user = nftIdToUser[nftId];
     // Limiting claim abilities to every other day
     require(user.timestamp < (block.timestamp - 1 days));
     uint users = fetchUserAmnt();
-    uint nfts = Treasury(trsryAdd).fetch1155NFTContractsCreated();
+    uint nfts = MarketMint(mintAdd).fetch1155NFTContractsCreated();
     uint totalUsers = users.add(nfts);
     uint splits = split.div(totalUsers);
     payable(msg.sender).transfer(splits);
@@ -321,7 +400,7 @@ contract RewardsControl is ReentrancyGuard {
       IERC20(toke.tokenAddress).transfer(payable(msg.sender), ercSplit);
       amnt[i+1] = 0;
     }
-    user = User(true, block.timestamp, user.userId, msg.sender);
+    user = User(true, user.claims, block.timestamp, user.userId, msg.sender);
     emit RewardsClaimed(msg.sender);
   }
 
@@ -333,6 +412,7 @@ contract RewardsControl is ReentrancyGuard {
     uint devLen = _devs.current();
     uint devId = addressToDevId[msg.sender];
     Dev memory _dev = idToDev[devId];
+    require(_dev.timestamp > 0, "Ineligible!");
     require(_dev.timestamp < (block.timestamp - 1 days));
     if (amountReceivable > 0){
       payable(msg.sender).transfer(amountReceivable.div(devLen));
@@ -342,7 +422,7 @@ contract RewardsControl is ReentrancyGuard {
         if(tokenAmount[j] > 0){
           uint reward = tokenAmount[j+1].div(devLen);
           IERC20(tokenAddresses[j+1]).transfer(payable(msg.sender), reward);
-          tokenAmount[j+1]-=reward;
+          tokenAmount[j+1] = tokenAmount[j+1].sub(reward);
           idToDev[devId] = Dev(block.timestamp, devId, _dev.devAddress);
         }
       }
@@ -375,8 +455,9 @@ contract RewardsControl is ReentrancyGuard {
     uint userAmnt = splits.mul(3);
     //*~~~> Check to see if the token address exists already
     if(id>0) {
-      idToTokens[id] = Token(id, token.tokenAmount+=userAmnt, tokenAddress);
-      tokenAmount[id]+=splits;
+      uint newAmnt = token.tokenAmount.add(userAmnt);
+      idToTokens[id] = Token(id, newAmnt, tokenAddress);
+      tokenAmount[id] = tokenAmount[id].add(splits);
     } else { //*~~~> If not, create a new ID for it
         _tokens.increment();
         uint tokenId = _tokens.current();
@@ -481,19 +562,14 @@ contract RewardsControl is ReentrancyGuard {
     Only used for internal storage array index recycling
 
       In order to reduce storage array size of listed items 
-        while maintaining specific enumerable bidId's, 
+        while maintaining specific enumerable id's, 
         any sold or removed item spots are recycled by referring to their index,
         else a new storage spot is created;
 
         We use the last item in the storage (length of array - 1 for 0 based index position),
         in order to pop off the item and avoid rewriting 
   <~~~*/
-  /// @dev
-    /*~~~>
-      _index: index of the id to be removed;
-    <~~~*/
-  function _remove(uint _index) internal {
-      require(_index < openStorage.length, "index out of bounds");
+  function _remove() internal {
       openStorage.pop();
     }
 
@@ -544,7 +620,7 @@ contract RewardsControl is ReentrancyGuard {
         throttle = 2;
       }
       uint users = fetchUserAmnt();
-      uint nfts = Treasury(trsryAdd).fetch1155NFTContractsCreated();
+      uint nfts = MarketMint(mintAdd).fetch1155NFTContractsCreated();
       uint totalUsers = users.add(nfts);
       uint splits = split.div(totalUsers).div(throttle);
       result = splits;
@@ -560,7 +636,7 @@ contract RewardsControl is ReentrancyGuard {
         throttle = 2;
       }
       uint users = fetchUserAmnt();
-      uint nfts = Treasury(trsryAdd).fetch1155NFTContractsCreated();
+      uint nfts = MarketMint(mintAdd).fetch1155NFTContractsCreated();
       uint totalUsers = users.add(nfts);
       for (uint i; i<_tokens.current(); i++) {
         Token memory toke = idToTokens[i+1];
@@ -581,12 +657,20 @@ contract RewardsControl is ReentrancyGuard {
     IERC1155(nftContract).safeTransferFrom(address(this), receiver, tokenId, amount, "");
   }
 
+  ///@notice DEV operations for emergency functions
+  function pause() public hasDevAdmin {
+      _pause();
+  }
+  function unpause() public hasDevAdmin {
+      _unpause();
+  }
+
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 
   function onERC721Received(

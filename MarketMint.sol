@@ -114,11 +114,8 @@ contract Mint is ReentrancyGuard, Pausable {
   bytes32 public constant REWARDS = keccak256("REWARDS");
 
   bytes32 public constant ERC721FACTORY = keccak256("ERC721FACTORY");
-  address nftFactory = RoleProvider(roleAdd).fetchAddress(ERC721FACTORY);
 
   bytes32 public constant ERC1155FACTORY = keccak256("ERC1155FACTORY");
-  address nft1155Factory = RoleProvider(roleAdd).fetchAddress(ERC1155FACTORY);
-
 
   //*~~~> Marketplace NFT that can be used to claim rewards and act as a DAO
   struct NFT {
@@ -272,6 +269,7 @@ contract Mint is ReentrancyGuard, Pausable {
   function newNftContract(address controller, address minter, string calldata name, string calldata symbol) public payable whenNotPaused returns(bool) {
     
     address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address nftFactory = RoleProvider(roleAdd).fetchAddress(ERC721FACTORY);
 
     require(msg.value >= deployAmount);
     NftFactory(nftFactory).newNftContract(controller, minter, name, symbol);
@@ -304,9 +302,10 @@ contract Mint is ReentrancyGuard, Pausable {
   function new1155Contract(address controller, address minter, string calldata tokenURI) public payable whenNotPaused returns(bool) {
 
     address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
-    
+    address nft1155Factory = RoleProvider(roleAdd).fetchAddress(ERC1155FACTORY);
+
     require(msg.value >= deployAmount);
-    Nft1155Factory(nftFactory).new1155Contract(controller, minter, tokenURI);
+    Nft1155Factory(nft1155Factory).new1155Contract(controller, minter, tokenURI);
     RewardsController(rewardsAddress).depositEthToDAO{value: msg.value}();
     _1155ContractsCreated.increment();
     uint256 contId = _1155ContractsCreated.current();

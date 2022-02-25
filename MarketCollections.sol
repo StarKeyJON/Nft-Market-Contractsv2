@@ -198,6 +198,7 @@ contract MarketCollections {
     return collection;
   }
 
+  // checks if the collection is restricted from trading, returns false if not
   function fetchCollection(address nftContract) public view returns (bool) {
     uint collectionCount = _collectionsAdded.current();
     if(collectionCount <= 0) return false;

@@ -548,11 +548,11 @@ contract RewardsControl is ReentrancyGuard, Pausable {
       // add received funds to devTokenAmount
       DevRewardToken memory devToken = idToDevToken[newTokenId];
       uint newDevAmnt = devToken.tokenAmount.add(devSplit);
-      idToDevToken[tokenId] = DevRewardToken(newTokenId, newDevAmnt, tokenAddress);
+      idToDevToken[newTokenId] = DevRewardToken(newTokenId, newDevAmnt, tokenAddress);
       // add received funds to daoTokenAmount
       DaoRewardToken memory daoToken = idToDaoToken[newTokenId];
       uint newDaoAmnt = daoToken.tokenAmount.add(daoSplit);
-      idToDaoToken[tokenId] = DaoRewardToken(newTokenId, newDaoAmnt, tokenAddress);
+      idToDaoToken[newTokenId] = DaoRewardToken(newTokenId, newDaoAmnt, tokenAddress);
     }
     emit Received(tokenAddress, amount); 
     return true;  

@@ -569,7 +569,6 @@ contract ERC721A is
 }
 
 
-//*~~~> SPDX-License-Identifier: MIT
 /*~~~>
     Thank you Phunks, your inspiration and phriendship meant the world to me and helped me through hard times.
       Never stop phighting, never surrender, always stand up for what is right and make the best of all situations towards all people.
@@ -626,6 +625,22 @@ contract ERC721A is
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@@@@///////////////@@@@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
  <~~~*/
+pragma solidity ^0.8.7;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+contract PhamNFTs is ERC721A, AccessControl {
+
+bytes32 public constant USER_OWNER_ROLE = keccak256("USER_OWNER");
+
+uint256 tokenId;
+uint256 price;
+uint256 supply;
+string baseUri;
+
 constructor(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol) ERC721A(tokenName, _tokenSymbol, 10, _supply) {
 _grantRole(DEFAULT_ADMIN_ROLE, controllerAddress);
 _grantRole(USER_OWNER_ROLE, userOwnerAddress);

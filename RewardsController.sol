@@ -162,7 +162,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   }
   struct DaoRewardToken {
     uint tokenId;
-    uint claimAmount;
+    uint tokenAmount;
     address contractAddress;
   }
   struct ClaimClock {
@@ -223,7 +223,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
       DevTeam memory _dev = idToDevTeam[i+1];
       // recycle old indexes if available
       if(_dev.devAddress==address(0x0)){
-        idToDevTeam[i+1] = DevTeam(block.timestamp, _dev.devIndex, devAddress);
+        idToDevTeam[i+1] = DevTeam(block.timestamp, _dev.devId, devAddress);
         addressToDevTeamId[devAddress] = i+1;
         added = true;
       }
@@ -249,7 +249,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   function removeDev(address devAddress) public hasDevAdmin nonReentrant returns(bool) {
     uint id = addressToDevTeamId[devAddress];
     DevTeam memory _dev = idToDevTeam[id];
-    idToDevTeam[id] = DevTeam(0, _dev.devIndex, address(0x0));
+    idToDevTeam[id] = DevTeam(0, _dev.devId, address(0x0));
     emit RemovedDev(devAddress);
     return true;
   }
@@ -426,7 +426,6 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     ClaimClock memory clock = idToClock[8];
     
     address mrktNft = RoleProvider(roleAdd).fetchAddress(NFTADD);
-    address mintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
 
     ///*~~~> require msg.sender to be a platform NFT holder
     require(IERC721(mrktNft).balanceOf(msg.sender) > 0, "Ineligible!");
@@ -460,8 +459,6 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   <~~~*/
   function claimDevRewards() public nonReentrant {
 
-    address mintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
-
     uint devId = addressToDevTeamId[msg.sender];
     DevTeam memory dev = idToDevTeam[devId];
     /// ensuring msg.sender is a dev address
@@ -475,15 +472,14 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     payable(dev.devAddress).transfer(devSplit);
     /// update new amount
     devEth = devEth.sub(devSplit);
-
     uint len = _tokens.current();
     for (uint i; i < len; i++) {
-      uint devsTokenAmount = devTokenAmount[i+1];
-      if(devsTokenAmount > 0){
-        uint ercSplit = (devsTokenAmount.div(_devs.current()));
+      DevRewardToken memory token = idToDevToken[i+1];
+      if(token.tokenAmount > 0){
+        uint ercSplit = (token.tokenAmount.div(_devs.current()));
         /// transfer token amount divided by total dev amount 
-        IERC20(ercSplit).transfer(payable(dev.devAddress), ercSplit);
-        tokenAmount = tokenAmount.sub(ercSplit);
+        IERC20(token.tokenAddress).transfer(payable(dev.devAddress), ercSplit);
+        token.tokenAmount = token.tokenAmount.sub(ercSplit);
         idToDevTeam[devId] = DevTeam(block.timestamp, devId, dev.devAddress);
       }
     }
@@ -541,17 +537,28 @@ contract RewardsControl is ReentrancyGuard, Pausable {
       // add received funds to devTokenAmount
       DevRewardToken memory devToken = idToDevToken[tokenId];
       uint newDevAmnt = devToken.tokenAmount.add(devSplit);
-      idToDevToken = DevRewardToken(tokenId, newDevAmnt, tokenAddress);
+      idToDevToken[tokenId] = DevRewardToken(tokenId, newDevAmnt, tokenAddress);
       // add received funds to daoTokenAmount
       DaoRewardToken memory daoToken = idToDaoToken[tokenId];
       uint newDaoAmnt = daoToken.tokenAmount.add(daoSplit);
-      idToDaoToken = DaoRewardToken(tokenId, newDaoAmnt, tokenAddress);
+      idToDaoToken[tokenId] = DaoRewardToken(tokenId, newDaoAmnt, tokenAddress);
     } else { //*~~~> else create a new ID for it
       _tokens.increment();
-      uint tokenId = _tokens.current();
-      addressToTokenId[tokenAddress] = tokenId;
-      idToUserToken[tokenId] = UserRewardToken(tokenId, userAmnt, tokenAddress);
-      tokenAddresses[tokenId] = tokenAddress;
+      uint newTokenId = _tokens.current();
+      addressToTokenId[tokenAddress] = newTokenId;
+      tokenAddresses[newTokenId] = tokenAddress;
+      // add received funds to total user token amount
+      UserRewardToken memory userToken = idToUserToken[newTokenId];
+      uint newAmnt = userToken.tokenAmount.add(userSplit);
+      idToUserToken[newTokenId] = UserRewardToken(newTokenId, newAmnt, tokenAddress);
+      // add received funds to devTokenAmount
+      DevRewardToken memory devToken = idToDevToken[newTokenId];
+      uint newDevAmnt = devToken.tokenAmount.add(devSplit);
+      idToDevToken[tokenId] = DevRewardToken(newTokenId, newDevAmnt, tokenAddress);
+      // add received funds to daoTokenAmount
+      DaoRewardToken memory daoToken = idToDaoToken[newTokenId];
+      uint newDaoAmnt = daoToken.tokenAmount.add(daoSplit);
+      idToDaoToken[tokenId] = DaoRewardToken(newTokenId, newDaoAmnt, tokenAddress);
     }
     emit Received(tokenAddress, amount); 
     return true;  
@@ -579,9 +586,9 @@ contract RewardsControl is ReentrancyGuard, Pausable {
       DaoRewardToken memory token = idToDaoToken[i+1];
       if (token.tokenAmount > 0) {
         IERC20(token.contractAddress).transfer(daoAdd, token.tokenAmount);
-        token = DaoRewardToken(0, token.contractAddress);
+        token = DaoRewardToken(token.tokenId, 0,token.contractAddress);
         /// update new amount
-        token.tokenAmount = token.tokenAmount.sub();
+        token.tokenAmount = 0;
       }
     }
   }
@@ -606,7 +613,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   //*~~~> Read functions for fetching amounts and data
   function fetchUsers() public view returns (User[] memory user){
     uint howMany = _users.current();
-    users = new User[](howMany);
+    User[] memory users = new User[](howMany);
     for (uint i; i < howMany; i++) {
       if (idToUser[i+1].canClaim) {
         User storage currentUser = idToUser[i+1];
@@ -616,13 +623,14 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     return users;
   }
 
-  function fetchHodler(uint tokenId) public view returns (NftHodler[] memory user){
-    return nftIdToHodler[tokenId];
+  function fetchHodler(uint tokenId) public view returns (NftHodler memory){
+    NftHodler memory hodler = nftIdToHodler[tokenId];
+    return hodler;
   }
-  
+
   function fetchDevs() public view returns (DevTeam[] memory dev){
     uint howMany = _devs.current();
-    devs = DevTeam[](howMany);
+    DevTeam[] memory devs = new DevTeam[](howMany);
     for (uint i; i < howMany; i++) {
       if (idToDevTeam[i+1].devAddress != address(0x0)) {
         DevTeam storage currentDev = idToDevTeam[i+1];
@@ -644,7 +652,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
 
   function fetchUserRewardTokens() public view returns (UserRewardToken[] memory token){
     uint count = _tokens.current();
-    tokens = new UserRewardToken[](count);
+    UserRewardToken[] memory tokens = new UserRewardToken[](count);
     for (uint i; i < count; i++) {
       tokens[i] = idToUserToken[i+1];
     }
@@ -652,7 +660,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   }
   function fetchDevRewardTokens() public view returns (DevRewardToken[] memory token){
     uint count = _tokens.current();
-    tokens = new DevRewardToken[](count);
+    DevRewardToken[] memory tokens = new DevRewardToken[](count);
     for (uint i; i < count; i++) {
       tokens[i] = idToDevToken[i+1];
     }
@@ -660,7 +668,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   }
   function fetchDaoRewardTokens() public view returns (DaoRewardToken[] memory token){
     uint count = _tokens.current();
-    tokens = new DaoRewardToken[](count);
+    DaoRewardToken[] memory tokens = new DaoRewardToken[](count);
     for (uint i; i < count; i++) {
       tokens[i] = idToDaoToken[i+1];
     }

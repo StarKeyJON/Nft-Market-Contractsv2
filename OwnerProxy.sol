@@ -89,7 +89,6 @@ interface NFTFactory {
   function setRoleAdd(address _role) external;
 }
 interface MarketMint {
-  function setFee(uint _feeMul) external;
   function setDeployAmnt(uint _deplyAmnt) external;
   function setRoleAdd(address _role) external;
   function setNewRedemption(uint amount, address _toke) external;
@@ -175,10 +174,8 @@ contract OwnerProxy is ReentrancyGuard, Pausable {
     address marketPlaceAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
     address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
     address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
-    address marketMintAdd = RoleProvider(roleAdd).fetchAddress(MINT);
     Offers(offersAdd).setFee(_fee);
     Bids(bidsAdd).setFee(_fee);
-    MarketMint(marketMintAdd).setFee(_fee);
     Marketplace(marketPlaceAdd).setFee(_fee);
     return true;
   }

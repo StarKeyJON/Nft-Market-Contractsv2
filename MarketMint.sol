@@ -94,7 +94,7 @@ interface RewardsController {
   function depositEthToDAO() payable external;
   function depositDAOERC20Rewards(uint amount, address tokenAddress) external;
 }
-contract MarketMint is ReentrancyGuard, Pausable {
+contract Mint is ReentrancyGuard, Pausable {
   using SafeMath for uint;
   using Counters for Counters.Counter;
   /*~~~>
@@ -105,7 +105,7 @@ contract MarketMint is ReentrancyGuard, Pausable {
   Counters.Counter private _1155ContractsCreated;
   Counters.Counter private _redemptionERC20;
 
-  uint64 public deployAmount;
+  uint public deployAmount;
   address public roleAdd;
 
   bytes32 public constant NFTADD = keccak256("NFT");
@@ -175,7 +175,7 @@ contract MarketMint is ReentrancyGuard, Pausable {
   /*~~~>
     Restricted access functions for mutable state variables  
   <~~~*/
-  function setDeployAmnt(uint64 _deployAmount) public hasAdmin returns(bool){
+  function setDeployAmnt(uint _deployAmount) public hasAdmin returns(bool){
     deployAmount = _deployAmount;
     return true;
   }
@@ -190,10 +190,10 @@ contract MarketMint is ReentrancyGuard, Pausable {
   <~~~*/
   /// @dev
   /*~~~>
-    uint64 _redeemAmount: Amount needed to redeem a NFT; 
+    uint _redeemAmount: Amount needed to redeem a NFT; 
     address _contract: address of the redemption token;
   <~~~*/
-  function resetRedemptionToken(uint64 _redeemAmount, address _contract) public hasAdmin returns(bool){
+  function resetRedemptionToken(uint _redeemAmount, address _contract) public hasAdmin returns(bool){
     uint index = _indexToRedemptionToken[_contract];
     RedemptionToken memory red = _idToRedemption[index];
     red = RedemptionToken(_redeemAmount, _contract);
@@ -328,6 +328,19 @@ contract MarketMint is ReentrancyGuard, Pausable {
   /*~~~>
   Functions for retrieving memory items
   <~~~*/
+
+  function fetchRedemptionTokens() public view returns (RedemptionToken[] memory) {
+    uint itemCount = _redemptionERC20.current();
+    RedemptionToken[] memory tokens = new RedemptionToken[](itemCount);
+    uint currentIndex;
+    for (uint i; i < itemCount; i++) {
+      RedemptionToken storage currentItem = _idToRedemption[i + 1];
+      tokens[currentIndex] = currentItem;
+      currentIndex++;
+    }
+    return tokens;
+  }
+
   function fetchNFTsCreated() public view returns (NFT[] memory) {
     uint itemCount = _nftsCreated.current();
     NFT[] memory nfts = new NFT[](itemCount);

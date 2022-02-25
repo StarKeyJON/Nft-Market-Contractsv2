@@ -1,4 +1,3 @@
-//*~~~> SPDX-License-Identifier: MIT OR Apache-2.0
 /*~~~>
     Thank you Phunks, your inspiration and phriendship meant the world to me and helped me through hard times.
       Never stop phighting, never surrender, always stand up for what is right and make the best of all situations towards all people.
@@ -55,7 +54,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@@@@///////////////@@@@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
  <~~~*/
-pragma solidity ^0.8.3;
+pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -69,7 +68,7 @@ interface MarketNFT {
   function safeMint(address to, string memory uri) external;
 }
 interface NftFactory {
-  function newNftContract(address controller, address minter, string memory name, string memory symbol) external;
+  function newNftContract(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol) external;
 }
 interface Nft1155Factory {
   function new1155Contract(address controller, address minter, string memory tokenURI) external;
@@ -95,7 +94,7 @@ interface RewardsController {
   function depositEthToDAO() payable external;
   function depositDAOERC20Rewards(uint amount, address tokenAddress) external;
 }
-contract Mint is ReentrancyGuard, Pausable {
+contract MarketMint is ReentrancyGuard, Pausable {
   using SafeMath for uint;
   using Counters for Counters.Counter;
   /*~~~>
@@ -260,19 +259,22 @@ contract Mint is ReentrancyGuard, Pausable {
   <~~~*/
   /// @dev
   /*~~~>
-    address controller: address of the Controller role;
-    address minter: address of the Minter role;
-    string calldata name: name of the Contract;
-    string calldata symbol: symbol of the Contract;
+  ( address: userOwnerAddress,
+    address: controllerAddress, 
+    address: minterAddress, 
+    uint256: _price, 
+    uint256: _supply, 
+    string: tokenName, 
+    string: _tokenSymbol ) 
   <~~~*/
   /// @return Bool
-  function newNftContract(address controller, address minter, string calldata name, string calldata symbol) public payable whenNotPaused returns(bool) {
+  function newNftContract(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol)  public payable whenNotPaused returns(bool) {
     
     address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
     address nftFactory = RoleProvider(roleAdd).fetchAddress(ERC721FACTORY);
 
     require(msg.value >= deployAmount);
-    NftFactory(nftFactory).newNftContract(controller, minter, name, symbol);
+    NftFactory(nftFactory).newNftContract(userOwnerAddress, controllerAddress, minterAddress, _price, _supply, tokenName, _tokenSymbol);
     RewardsController(rewardsAddress).depositEthToDAO{value: msg.value}();
     _contractsCreated.increment();
     uint256 contId = _contractsCreated.current();

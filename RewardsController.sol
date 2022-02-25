@@ -108,8 +108,6 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   /*~~~> Open storage indexes <~~~*/
   uint[] private openStorage;
 
-  //*~~~> counter increments
-
   Counters.Counter private _devs;
   Counters.Counter private _users;
   Counters.Counter private _nftHodlers;
@@ -132,7 +130,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     roleAdd = _role;
   }
 
-  //*~~~> Declaring object structures for User Rewards & Tokens <~~~*/
+  //*~~~> Declaring object structures for Split Rewards & Tokens <~~~*/
   struct User {
     bool canClaim;
     uint claims;
@@ -199,7 +197,6 @@ contract RewardsControl is ReentrancyGuard, Pausable {
 
   //*~~~> Declaring event structures
   event NewUser(uint indexed userId, address indexed userAddress);
-  event NewDistribution(uint indexed timestamp, uint userAmount);
   event RewardsClaimed(address indexed userAddress);
   event NewDev(address indexed devAddress);
   event RemovedDev(address indexed devAddress);
@@ -458,11 +455,10 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     Only an address that exists in the dev array will receive anything.
   <~~~*/
   function claimDevRewards() public nonReentrant {
-
     uint devId = addressToDevTeamId[msg.sender];
     DevTeam memory dev = idToDevTeam[devId];
     /// ensuring msg.sender is a dev address
-    require(dev.devAddress != address(0x0));
+    require(dev.devAddress == msg.sender);
 
     ///*~~~> Limiting claim abilities to once a day
     require(dev.timestamp  < (block.timestamp - 1 days), "Ineligible!");

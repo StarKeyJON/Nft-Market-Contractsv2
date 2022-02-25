@@ -86,11 +86,11 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   address roleAdd;
 
   //*~~~> amount of ETH to split between Users;
-  uint userEth;
+  uint public userEth;
   //*~~~> amount of ETH to split between Devs;
-  uint devEth;
+  uint public devEth;
   //*~~~> amount of ETH to split between DAO;
-  uint daoEth;
+  uint public daoEth;
 
   //*~~~> Platform fee
   uint public fee;

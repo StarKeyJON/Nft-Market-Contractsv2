@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
@@ -555,7 +555,9 @@ contract ERC721A is
     uint256 quantity
   ) internal virtual {}
 }
-pragma solidity >=0.8.0 <0.9.0;
+
+
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
@@ -571,11 +573,12 @@ uint256 price;
 uint256 supply;
 string baseUri;
 
-constructor(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol, string memory _baseUri) ERC721A(tokenName, _tokenSymbol, 10, _supply) {
-  _grantRole(DEFAULT_ADMIN_ROLE, controllerAddress);
-  _grantRole(USER_OWNER_ROLE, userOwnerAddress);
+constructor(address userOwnerAddress, address controllerAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol, string memory _baseUri) ERC721A(tokenName, _tokenSymbol, 10, _supply) {
+_grantRole(DEFAULT_ADMIN_ROLE, controllerAddress);
+_grantRole(USER_OWNER_ROLE, userOwnerAddress);
   supply = _supply;
-  price = _price;
+  setPrice(_price);
+  setBaseUri(_baseUri);
   baseUri = _baseUri;
 }
 
@@ -588,17 +591,20 @@ function safeMint(address to, uint256 count) public payable {
 function setPrice(uint256 _price) public onlyRole(USER_OWNER_ROLE) {
   price = _price;
 }
-
 function setBaseUri(string memory _baseUri) public onlyRole(USER_OWNER_ROLE) {
   baseUri = _baseUri;
 }
-
 function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
   require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
   return string(abi.encodePacked(baseUri, Strings.toString(_tokenId), ".json"));
 }
 
-  function supportsInterface(bytes4 interfaceId) public view override(ERC721A, AccessControl) returns (bool) {
-    return super.supportsInterface(interfaceId);
-  }
+function supportsInterface(bytes4 interfaceId)
+public
+view
+override(ERC721A, AccessControl)
+returns (bool)
+{
+  return super.supportsInterface(interfaceId);
+}
 }

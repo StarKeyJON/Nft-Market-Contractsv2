@@ -328,6 +328,18 @@ contract MarketMint is ReentrancyGuard, Pausable {
   /*~~~>
   Functions for retrieving memory items
   <~~~*/
+  function fetchRedemptionTokens() public view returns (RedemptionToken[] memory) {
+    uint itemCount = _redemptionERC20.current();
+    RedemptionToken[] memory tokens = new RedemptionToken[](itemCount);
+    uint currentIndex;
+    for (uint i; i < itemCount; i++) {
+      RedemptionToken storage currentItem = _idToRedemption[i + 1];
+      tokens[currentIndex] = currentItem;
+      currentIndex++;
+    }
+    return tokens;
+  }
+  
   function fetchNFTsCreated() public view returns (NFT[] memory) {
     uint itemCount = _nftsCreated.current();
     NFT[] memory nfts = new NFT[](itemCount);

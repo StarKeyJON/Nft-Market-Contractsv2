@@ -195,8 +195,7 @@ contract Mint is ReentrancyGuard, Pausable {
   <~~~*/
   function resetRedemptionToken(uint _redeemAmount, address _contract) public hasAdmin returns(bool){
     uint index = _indexToRedemptionToken[_contract];
-    RedemptionToken memory red = _idToRedemption[index];
-    red = RedemptionToken(_redeemAmount, _contract);
+    _idToRedemption[index] = RedemptionToken(_redeemAmount, _contract);
     return true;
   }
   

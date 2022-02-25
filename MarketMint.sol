@@ -123,12 +123,13 @@ contract MarketMint is ReentrancyGuard, Pausable {
   }
   //*~~~> New ERC721 Contracts
   struct NFTContract {
-    string name;
-    string symbol;
-    uint ContractId;
-    address controller;
-    address minter;
-    address creator;
+    address userOwnerAddress;
+    address controllerAddress;
+    address minterAddress;
+    uint256 _price;
+    uint256 _supply;
+    string tokenName;
+    string _tokenSymbol;
   }
   //*~~~> New ERC1155 Contracts
   struct NFT1155Contract {
@@ -279,12 +280,13 @@ contract MarketMint is ReentrancyGuard, Pausable {
     _contractsCreated.increment();
     uint256 contId = _contractsCreated.current();
     _idToNftContract[contId] = NFTContract(
-      name,
-      symbol,
-      contId,
-      controller,
-      minter,
-      msg.sender
+    userOwnerAddress,
+    controllerAddress,
+    minterAddress,
+    _price,
+    _supply,
+    tokenName,
+    _tokenSymbol
     );
     return true;
   }

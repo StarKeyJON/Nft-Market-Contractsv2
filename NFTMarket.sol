@@ -290,7 +290,7 @@ contract NFTMarket is ReentrancyGuard, Pausable {
   ///@return Bool
   function delistMktItems(
     uint256[] calldata itemId
-  ) public whenPaused nonReentrant returns(bool){
+  ) public nonReentrant returns(bool){
 
     address rewardsAdd = RoleProvider(roleAdd).fetchAddress(REWARDS);
     address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
@@ -419,7 +419,7 @@ contract NFTMarket is ReentrancyGuard, Pausable {
       tokenId: Id of the token to be transfered;
       to: address of recipient;
     <~~~*/
-function transferFromERC721(address assetAddr, uint256 tokenId, address to) internal virtual whenPaused {
+function transferFromERC721(address assetAddr, uint256 tokenId, address to) internal virtual  {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;
@@ -452,7 +452,7 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
       to: address of recipient;
       tokenId: Id of the token to be transfered;
     <~~~*/
-  function approveERC721(address assetAddr, address to, uint256 tokenId) internal virtual whenPaused {
+  function approveERC721(address assetAddr, address to, uint256 tokenId) internal virtual  {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;
@@ -482,7 +482,7 @@ function transferFromERC721(address assetAddr, uint256 tokenId, address to) inte
       to: address of the recipient;
       tokenId: Id of the token to be transfered;
     <~~~*/
-  function transferERC721(address assetAddr, address to, uint256 tokenId) internal virtual whenPaused {
+  function transferERC721(address assetAddr, address to, uint256 tokenId) internal virtual  {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;

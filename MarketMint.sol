@@ -91,7 +91,7 @@ interface RoleProvider {
   function fetchAddress(bytes32 _var) external returns(address);
 }
 interface RewardsController {
-  function createUser(address userAddress) external;
+  function createNftHodler(uint tokenId) external;
   function depositEthToDAO() payable external;
   function depositDAOERC20Rewards(uint amount, address tokenAddress) external;
 }
@@ -248,7 +248,7 @@ contract Mint is ReentrancyGuard, Pausable {
     RewardsController(rewardsAddress).depositDAOERC20Rewards(amount, token.contractAddress);
     _idToRedemption[id] = RedemptionToken(token.redeemAmount, token.contractAddress);
 
-    RewardsController(rewardsAddress).createUser(msg.sender);
+    RewardsController(rewardsAddress).createNftHodler(nftId);
 
     emit nftCreated(nftId, msg.sender);
     return true;

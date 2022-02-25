@@ -1,4 +1,3 @@
-//*~~~> SPDX-License-Identifier: unlicensed
 pragma solidity  >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -6,6 +5,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract MarketRoleProvider is AccessControl {
 
   address public marketplaceAdd;
+  address public daoAdd;
   address public nftAdd;
   address public marketMintAdd;
   address public collectionsAdd;
@@ -30,6 +30,7 @@ contract MarketRoleProvider is AccessControl {
   bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE");
 
   //*~~~> For tracking contract addresses
+  bytes32 public constant DAO = keccak256("DAO"); 
   bytes32 public constant DEV = keccak256("DEV");
   bytes32 public constant NFT = keccak256("NFT");
   bytes32 public constant MINT = keccak256("MINT");
@@ -68,6 +69,11 @@ contract MarketRoleProvider is AccessControl {
     return true;
   }
 
+  function setDaoAdd(address _daoAdd) hasAdmin public returns(bool){
+    daoAdd = _daoAdd;
+    marketBytes[DAO]= _daoAdd;
+    return true;
+  }
   function setMarketAdd(address _mrktAdd) hasAdmin public returns(bool){
     marketplaceAdd = _mrktAdd;
     marketBytes[MARKET]= _mrktAdd;

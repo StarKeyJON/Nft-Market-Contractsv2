@@ -483,7 +483,7 @@ contract MarketBids is ReentrancyGuard, Pausable {
       isBlind: if it is a blind blind (true);
     <~~~*/
   /// @return Bool
-  function withdrawBid(uint[] memory bidId, bool[] memory isBlind) public whenPaused nonReentrant returns(bool){
+  function withdrawBid(uint[] memory bidId, bool[] memory isBlind) public  nonReentrant returns(bool){
     for (uint i;i<bidId.length;i++){
       if (isBlind[i]){
         BlindBid memory bid = idToBlindBid[bidId[i]];

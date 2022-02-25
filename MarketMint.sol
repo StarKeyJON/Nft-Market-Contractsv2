@@ -1,4 +1,3 @@
-//*~~~> SPDX-License-Identifier: MIT OR Apache-2.0
 /*~~~>
     Thank you Phunks, your inspiration and phriendship meant the world to me and helped me through hard times.
       Never stop phighting, never surrender, always stand up for what is right and make the best of all situations towards all people.
@@ -55,11 +54,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@@@@///////////////@@@@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
  <~~~*/
-pragma solidity ^0.8.3;
+pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
 /*~~~>
 Interface declarations for upgradable contracts
@@ -68,7 +68,7 @@ interface MarketNFT {
   function safeMint(address to, string memory uri) external;
 }
 interface NftFactory {
-  function newNftContract(address controller, address minter, string memory name, string memory symbol) external;
+  function newNftContract(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol) external;
 }
 interface Nft1155Factory {
   function new1155Contract(address controller, address minter, string memory tokenURI) external;
@@ -87,13 +87,14 @@ interface IERC20 {
 }
 interface RoleProvider {
   function hasTheRole(bytes32 role, address _address) external returns(bool);
+  function fetchAddress(bytes32 _var) external returns(address);
 }
 interface RewardsController {
-  function createUser(address userAddress) external;
+  function createNftHodler(uint tokenId) external;
   function depositEthToDAO() payable external;
   function depositDAOERC20Rewards(uint amount, address tokenAddress) external;
 }
-contract Mint is ReentrancyGuard {
+contract MarketMint is ReentrancyGuard, Pausable {
   using SafeMath for uint;
   using Counters for Counters.Counter;
   /*~~~>
@@ -105,13 +106,15 @@ contract Mint is ReentrancyGuard {
   Counters.Counter private _redemptionERC20;
 
   uint64 public deployAmount;
-  uint64 public newNftAmount;  
   address public roleAdd;
-  address public controlAddress;
-  address public nftFactory;
-  address public nft1155Factory;
-  address public nftAddress;
-  address public rewardsAddress;
+
+  bytes32 public constant NFTADD = keccak256("NFT");
+
+  bytes32 public constant REWARDS = keccak256("REWARDS");
+
+  bytes32 public constant ERC721FACTORY = keccak256("ERC721FACTORY");
+
+  bytes32 public constant ERC1155FACTORY = keccak256("ERC1155FACTORY");
 
   //*~~~> Marketplace NFT that can be used to claim rewards and act as a DAO
   struct NFT {
@@ -120,12 +123,13 @@ contract Mint is ReentrancyGuard {
   }
   //*~~~> New ERC721 Contracts
   struct NFTContract {
-    string name;
-    string symbol;
-    uint ContractId;
-    address controller;
-    address minter;
-    address creator;
+    address userOwnerAddress;
+    address controllerAddress;
+    address minterAddress;
+    uint256 _price;
+    uint256 _supply;
+    string tokenName;
+    string _tokenSymbol;
   }
   //*~~~> New ERC1155 Contracts
   struct NFT1155Contract {
@@ -143,9 +147,13 @@ contract Mint is ReentrancyGuard {
 
   //*~~~> Roles for designated accessibility
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
-  
+  bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE");
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
+    _;
+  }
+  modifier hasDevAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), "DOES NOT HAVE DEV ROLE");
     _;
   }
 
@@ -171,41 +179,21 @@ contract Mint is ReentrancyGuard {
     deployAmount = _deployAmount;
     return true;
   }
-  function setMrktNFTAdd(address _nft) public hasAdmin returns(bool){
-    nftAddress = _nft;
-    return true;
-  }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAddress = _contAdd;
-    return true;
-  }
-  function setNFTFactoryAdd(address _nftFactory) public hasAdmin returns(bool){
-    nftFactory = _nftFactory;
-    return true;
-  }
-  function setNFT1155FactoryAdd(address _nft1155Factory) public hasAdmin returns(bool){
-    nft1155Factory = _nft1155Factory;
-    return true;
-  }
   function setRoleAdd(address _role) public hasAdmin returns(bool){
     roleAdd = _role;
-    return true;
-  }
-  function setRwdsAdd(address _rewards) public hasAdmin returns(bool){
-    rewardsAddress = _rewards;
     return true;
   }
 
   /// @notice
   /*~~~>
-    Function for setting the redemption token details
+    Function for re - setting the redemption token details
   <~~~*/
   /// @dev
   /*~~~>
     uint64 _redeemAmount: Amount needed to redeem a NFT; 
     address _contract: address of the redemption token;
   <~~~*/
-  function setRedemptionToken(uint64 _redeemAmount, address _contract) public hasAdmin returns(bool){
+  function resetRedemptionToken(uint64 _redeemAmount, address _contract) public hasAdmin returns(bool){
     uint index = _indexToRedemptionToken[_contract];
     RedemptionToken memory red = _idToRedemption[index];
     red = RedemptionToken(_redeemAmount, _contract);
@@ -239,7 +227,11 @@ contract Mint is ReentrancyGuard {
     string memory uri: uri for the NFT
   <~~~*/
   /// @return Bool
-  function redeemForNft(uint id, uint amount, address to, string memory uri) public returns(bool){
+  function redeemForNft(uint id, uint amount, address to, string memory uri) public whenNotPaused returns(bool){
+
+    address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address nftAddress = RoleProvider(roleAdd).fetchAddress(NFTADD);
+
     RedemptionToken memory token = _idToRedemption[id];
     require(amount >= token.redeemAmount);
 
@@ -256,7 +248,7 @@ contract Mint is ReentrancyGuard {
     RewardsController(rewardsAddress).depositDAOERC20Rewards(amount, token.contractAddress);
     _idToRedemption[id] = RedemptionToken(token.redeemAmount, token.contractAddress);
 
-    RewardsController(rewardsAddress).createUser(msg.sender);
+    RewardsController(rewardsAddress).createNftHodler(nftId);
 
     emit nftCreated(nftId, msg.sender);
     return true;
@@ -268,25 +260,33 @@ contract Mint is ReentrancyGuard {
   <~~~*/
   /// @dev
   /*~~~>
-    address controller: address of the Controller role;
-    address minter: address of the Minter role;
-    string calldata name: name of the Contract;
-    string calldata symbol: symbol of the Contract;
+  ( address: userOwnerAddress,
+    address: controllerAddress, 
+    address: minterAddress, 
+    uint256: _price, 
+    uint256: _supply, 
+    string: tokenName, 
+    string: _tokenSymbol ) 
   <~~~*/
   /// @return Bool
-  function newNftContract(address controller, address minter, string calldata name, string calldata symbol) public payable returns(bool) {
+  function newNftContract(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol)  public payable whenNotPaused returns(bool) {
+    
+    address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address nftFactory = RoleProvider(roleAdd).fetchAddress(ERC721FACTORY);
+
     require(msg.value >= deployAmount);
-    NftFactory(nftFactory).newNftContract(controller, minter, name, symbol);
+    NftFactory(nftFactory).newNftContract(userOwnerAddress, controllerAddress, minterAddress, _price, _supply, tokenName, _tokenSymbol);
     RewardsController(rewardsAddress).depositEthToDAO{value: msg.value}();
     _contractsCreated.increment();
     uint256 contId = _contractsCreated.current();
     _idToNftContract[contId] = NFTContract(
-      name,
-      symbol,
-      contId,
-      controller,
-      minter,
-      msg.sender
+    userOwnerAddress,
+    controllerAddress,
+    minterAddress,
+    _price,
+    _supply,
+    tokenName,
+    _tokenSymbol
     );
     return true;
   }
@@ -303,9 +303,13 @@ contract Mint is ReentrancyGuard {
     string calldata tokenURI: uri for the Contract;
   <~~~*/
   /// @return Bool
-  function new1155Contract(address controller, address minter, string calldata tokenURI) public payable returns(bool) {
+  function new1155Contract(address controller, address minter, string calldata tokenURI) public payable whenNotPaused returns(bool) {
+
+    address rewardsAddress =  RoleProvider(roleAdd).fetchAddress(REWARDS);
+    address nft1155Factory = RoleProvider(roleAdd).fetchAddress(ERC1155FACTORY);
+
     require(msg.value >= deployAmount);
-    Nft1155Factory(nftFactory).new1155Contract(controller, minter, tokenURI);
+    Nft1155Factory(nft1155Factory).new1155Contract(controller, minter, tokenURI);
     RewardsController(rewardsAddress).depositEthToDAO{value: msg.value}();
     _1155ContractsCreated.increment();
     uint256 contId = _1155ContractsCreated.current();
@@ -374,11 +378,19 @@ contract Mint is ReentrancyGuard {
     return contracts;
   }
 
+  ///@notice DEV operations for emergency functions
+  function pause() public hasDevAdmin {
+      _pause();
+  }
+  function unpause() public hasDevAdmin {
+      _unpause();
+  }
+
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAddress).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAddress);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 }

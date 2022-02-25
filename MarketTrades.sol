@@ -1,5 +1,3 @@
-//*~~~>*~~~> SPDX-License-Identifier: MIT OR Apache-2.0
-/*~~~>
 /*~~~>
     Thank you Phunks, your inspiration and phriendship meant the world to me and helped me through hard times.
       Never stop phighting, never surrender, always stand up for what is right and make the best of all situations towards all people.
@@ -63,6 +61,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Receiver.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
 /*~~~>
 Interface declarations for upgradable contracts
@@ -72,6 +71,7 @@ interface NFTMkt {
 }
 interface RoleProvider {
   function hasTheRole(bytes32 role, address _address) external returns(bool);
+  function fetchAddress(bytes32 _var) external returns(address);
 }
 interface Offers {
   function fetchOfferId(uint marketId) external returns(uint);
@@ -85,7 +85,7 @@ interface Collections {
   function fetchCollection(address nftContract) external returns(bool);
 }
 
-contract MarketTrades is ReentrancyGuard {
+contract MarketTrades is ReentrancyGuard, Pausable {
   using Counters for Counters.Counter;
   
   //*~~~> counter increments NFTs Trade Offers
@@ -95,7 +95,7 @@ contract MarketTrades is ReentrancyGuard {
   //*~~~> Roles for designated accessibility
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE");
   bytes32 public constant CONTRACT_ROLE = keccak256("CONTRACT_ROLE");
-  
+  bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE");
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
     _;
@@ -104,23 +104,29 @@ contract MarketTrades is ReentrancyGuard {
     require(RoleProvider(roleAdd).hasTheRole(CONTRACT_ROLE, msg.sender), "DOES NOT HAVE CONTRACT ROLE");
     _;
   }
+  modifier hasDevAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), "DOES NOT HAVE DEV ROLE");
+    _;
+  }
 
-  //*~~~> Upgradable addresses for Market & Treasury
+  //*~~~> Upgradable addresses
   address public roleAdd;
-  address public controlAdd;
-  address public marketAdd;
-  address public mintAdd;
-  address public bidsAdd;
-  address public collsAdd;
-  address public offersAdd;
+
+  //*~~~> global address variable from Role Provider contract
+  bytes32 public constant MARKET = keccak256("MARKET");
+
+  bytes32 public constant BIDS = keccak256("BIDS");
+
+  bytes32 public constant COLLECTION = keccak256("COLLECTION");
+
+  bytes32 public constant OFFERS = keccak256("OFFERS");
+
   uint[] private openStorage;
   uint[] private blindOpenStorage;
 
   //*~~~> Fee constructor initially set to .005%
-  constructor(address _role, address _mrktAdd, address _mintAdd){
+  constructor(address _role){
     roleAdd = _role;
-    marketAdd = _mrktAdd;
-    mintAdd = _mintAdd;
   }
 
   //*~~~> Declaring object struct for trades entered
@@ -209,36 +215,6 @@ contract MarketTrades is ReentrancyGuard {
       address seller
   );
 
-  /*~~~> Allowing for upgradability of proxy addresses <~~~*/
-  function setMrktAdd(address _newAdd) public nonReentrant hasAdmin returns(bool){
-      marketAdd = _newAdd;
-      return true;
-  }
-  function setMarketMintAdd(address _newAdd) public nonReentrant hasAdmin returns(bool){
-      mintAdd = _newAdd;
-      return true;
-  }
-  function setControlAdd(address _contAdd) public nonReentrant hasAdmin returns(bool){
-      controlAdd = _contAdd;
-      return true;
-  }
-  function setCollAdd(address _coll) public hasAdmin returns(bool) {
-    collsAdd = _coll;
-    return true;
-  }
-  function setBidAdd(address _bid) public hasAdmin returns(bool) {
-    bidsAdd = _bid;
-    return true;
-  }
-  function setOffersAdd(address _offer) public hasAdmin returns(bool) {
-    offersAdd = _offer;
-    return true;
-  }
-  function setRoleAdd(address _role) public hasAdmin returns(bool){
-    roleAdd = _role;
-    return true;
-  }
-
   ///@notice
   /*~~~>
     Public function to enter a trade of an ERC721 or ERC1155 NFT for any item listed on market
@@ -257,12 +233,12 @@ contract MarketTrades is ReentrancyGuard {
       uint[] memory tokenId,
       address[] memory nftContract,
       address[] memory seller
-  ) public nonReentrant returns(bool){
+  ) public whenNotPaused nonReentrant returns(bool){
     for (uint i;i<itemId.length;i++) {
       uint tradeId;
       if (openStorage.length>=1) {
         tradeId = openStorage[openStorage.length-1];
-        _remove(openStorage.length-1, 0);
+        _remove(0);
       } else {
         _trades.increment();
         tradeId = _trades.current();
@@ -319,12 +295,15 @@ contract MarketTrades is ReentrancyGuard {
       uint[] memory amount1155,
       address[] memory nftContract,
       address[] memory wantContract
-  ) public nonReentrant{
+  ) public whenNotPaused nonReentrant{
+
+    address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+
     for (uint i;i<tokenId.length;i++) {
       uint tradeId;
       if (blindOpenStorage.length>=1) {
         tradeId = blindOpenStorage[blindOpenStorage.length-1];
-        _remove(blindOpenStorage.length-1, 1);
+        _remove(1);
       } else {
         _blindTrades.increment();
         tradeId = _blindTrades.current();
@@ -363,7 +342,7 @@ contract MarketTrades is ReentrancyGuard {
       bool[] memory isBlind,
       uint[] memory itemId,
       uint[] memory tradeId
-  ) public nonReentrant returns(bool){
+  ) public whenPaused nonReentrant returns(bool){
     for (uint i; i<itemId.length; i++) {
       if(isBlind[i]){
       BlindTrade memory trade = idToBlindTrade[tradeId[i]];
@@ -418,7 +397,7 @@ contract MarketTrades is ReentrancyGuard {
     tradeId: trade item id for this internal storage;
   <~~~*/
   ///@return Bool
-  function refundTrade(uint itemId, uint tradeId) public nonReentrant hasContractAdmin returns(bool){
+  function refundTrade(uint itemId, uint tradeId) public nonReentrant hasContractAdmin whenPaused returns(bool){
     Trade memory trade = idToNftTrade[tradeId];
     if ( trade.is1155 ){
       IERC1155(trade.nftCont).safeTransferFrom(address(this), trade.trader, trade.tokenId, trade.amount1155, "");
@@ -454,6 +433,11 @@ contract MarketTrades is ReentrancyGuard {
       uint[] calldata itemId,
       uint[] calldata tradeId
   ) public nonReentrant returns(bool){
+    
+    address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
+    address bidsAdd = RoleProvider(roleAdd).fetchAddress(BIDS);
+    address offersAdd = RoleProvider(roleAdd).fetchAddress(OFFERS);
+
     for(uint i; i<itemId.length;i++) {
       Trade memory trade = idToNftTrade[tradeId[i]];
       require(msg.sender == trade.seller,"Not Owner");
@@ -517,7 +501,8 @@ contract MarketTrades is ReentrancyGuard {
       uint[] memory tradeId,
       uint[] memory tokenId,
       uint[] memory listedId
-  ) public nonReentrant returns(bool){
+  ) public whenNotPaused nonReentrant returns(bool){
+    address marketAdd = RoleProvider(roleAdd).fetchAddress(MARKET);
     for(uint i; i<tradeId.length;i++) {
       uint j = tradeId[i];
       BlindTrade memory trade = idToBlindTrade[j];
@@ -577,7 +562,7 @@ contract MarketTrades is ReentrancyGuard {
       tokenId: Id of the token to be transfered;
       to: address of recipient;
     <~~~*/
-  function transferFromERC721(address assetAddr, uint256 tokenId, address to) internal virtual {
+  function transferFromERC721(address assetAddr, uint256 tokenId, address to) whenPaused internal virtual {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;
@@ -611,7 +596,7 @@ contract MarketTrades is ReentrancyGuard {
       to: address of recipient;
       tokenId: Id of the token to be transfered;
     <~~~*/
-  function approveERC721(address assetAddr, address to, uint256 tokenId) internal virtual {
+  function approveERC721(address assetAddr, address to, uint256 tokenId) whenPaused internal virtual {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;
@@ -641,7 +626,7 @@ contract MarketTrades is ReentrancyGuard {
       to: address of the recipient;
       tokenId: Id of the token to be transfered;
     <~~~*/
-  function transferERC721(address assetAddr, address to, uint256 tokenId) internal virtual {
+  function transferERC721(address assetAddr, address to, uint256 tokenId) whenPaused internal virtual {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;
@@ -674,12 +659,38 @@ contract MarketTrades is ReentrancyGuard {
     }
     return trades;
   }
-    function fetchBlindTrades() public view returns (BlindTrade[] memory) {
+  function fetchUserTrades(address user) public view returns (Trade[] memory) {
+    uint itemCount = _trades.current();
+    uint currentIndex;
+    Trade[] memory trades = new Trade[](itemCount);
+    for (uint i; i < itemCount; i++) {
+      if (idToNftTrade[i + 1].trader == user) {
+        Trade storage currentItem = idToNftTrade[i + 1];
+         trades[currentIndex] = currentItem;
+         currentIndex++;
+      }
+    }
+    return trades;
+  }
+  function fetchBlindTrades() public view returns (BlindTrade[] memory) {
     uint itemCount = _blindTrades.current();
     uint currentIndex;
     BlindTrade[] memory trades = new BlindTrade[](itemCount);
     for (uint i; i < itemCount; i++) {
       if (idToBlindTrade[i + 1].isActive) {
+        BlindTrade storage currentItem = idToBlindTrade[i + 1];
+         trades[currentIndex] = currentItem;
+         currentIndex++;
+      }
+    }
+    return trades;
+  }
+  function fetchUserBlindTrades(address user) public view returns (BlindTrade[] memory) {
+    uint itemCount = _blindTrades.current();
+    uint currentIndex;
+    BlindTrade[] memory trades = new BlindTrade[](itemCount);
+    for (uint i; i < itemCount; i++) {
+      if (idToBlindTrade[i + 1].trader == user) {
         BlindTrade storage currentItem = idToBlindTrade[i + 1];
          trades[currentIndex] = currentItem;
          currentIndex++;
@@ -727,13 +738,7 @@ contract MarketTrades is ReentrancyGuard {
         We use the last item in the storage (length of array - 1),
         in order to pop off the item and avoid rewriting 
   <~~~*/
-  /// @dev
-    /*~~~>
-      _index: index of the id to be removed;
-      store: if regular bid (0) else if blind offer (1)
-    <~~~*/
-  function _remove(uint _index, uint store) internal {
-      require(_index < openStorage.length, "index out of bound");
+  function _remove(uint store) internal {
       if (store==0){
       openStorage.pop();
       } else if (store==1){
@@ -741,12 +746,20 @@ contract MarketTrades is ReentrancyGuard {
       }
     }
 
+  ///@notice DEV operations for emergency functions
+  function pause() public hasDevAdmin {
+      _pause();
+  }
+  function unpause() public hasDevAdmin {
+      _unpause();
+  }
+
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
   
   function onERC1155Received(address, address, uint256, uint256, bytes memory) public virtual returns (bytes4) {

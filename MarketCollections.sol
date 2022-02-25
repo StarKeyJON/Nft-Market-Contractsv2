@@ -1,5 +1,3 @@
-//*~~~> SPDX-License-Identifier: MIT OR Apache-2.0
-
 /*~~~>
     Thank you Phunks, your inspiration and phriendship meant the world to me and helped me through hard times.
       Never stop phighting, never surrender, always stand up for what is right and make the best of all situations towards all people.
@@ -70,9 +68,6 @@ pragma solidity  >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-interface Phunky {
-  function balanceOf(address owner) external view returns(uint256);
-}
 interface RoleProvider {
   function hasTheRole(bytes32 role, address _address) external returns(bool);
 }
@@ -87,15 +82,19 @@ contract MarketCollections {
 
   //*~~~> Roles for designated accessibility
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
+  bytes32 public constant DEV_ROLE = keccak256("DEV_ROLE"); 
   string Mess = "DOES NOT HAVE ADMIN ROLE";
   address public roleAdd;
-  address public controlAdd;
   
   constructor(address _role) {
     roleAdd = _role;
   }
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), Mess);
+    _;
+  }
+  modifier hasDevAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(DEV_ROLE, msg.sender), Mess);
     _;
   }
 
@@ -107,8 +106,14 @@ contract MarketCollections {
     address collectionContract;
   }
 
+  struct TokenList{
+    bool canOffer;
+    address tokenAdd;
+  }
+
   //*~~~> Memory array of all listed Market Collections
   mapping(uint256 => MarketCollection) private idToCollection;
+  mapping(address => TokenList) private addressToToken;
 
   //*~~~> Declaring event object structure for new collection added
   event CollectionAdded(
@@ -127,10 +132,6 @@ contract MarketCollections {
 
   function setRoleAdd(address _role) public hasAdmin returns(bool){
     roleAdd = _role;
-    return true;
-  }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAdd = _contAdd;
     return true;
   }
 
@@ -178,6 +179,18 @@ contract MarketCollections {
     return true;
   }
 
+  //*~~~> sets approved tokens for offers
+  function setTokenList(bool[] calldata _canOffer, address[] calldata _token) public hasDevAdmin returns (bool) {
+    for (uint i; i < _token.length; i++){
+      addressToToken[_token[i]] = TokenList(_canOffer[i], _token[i]);
+    }
+    return true;
+  }
+
+  function canOfferToken(address token) public view returns(bool){
+    return addressToToken[token].canOffer;
+  }
+
   /// @notice
     //*~~~> Public read functions for internal state
   function fetchCollectionItem(uint collectionId) public view returns (MarketCollection memory) {
@@ -216,11 +229,11 @@ contract MarketCollections {
   }
 
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 }
 

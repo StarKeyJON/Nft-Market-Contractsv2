@@ -1,4 +1,3 @@
-//*~~~> SPDX-License-Identifier: MIT OR Apache-2.0
 /*~~~>
     Thank you Phunks, your inspiration and phriendship meant the world to me and helped me through hard times.
       Never stop phighting, never surrender, always stand up for what is right and make the best of all situations towards all people.
@@ -55,7 +54,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@@@@///////////////@@@@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
  <~~~*/
-pragma solidity ^0.8.3;
+pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./Pham1155.sol";
@@ -85,11 +84,14 @@ contract ERC1155Factory {
     Roles for designated accessibility
   <~~~*/
   address roleAdd;
-  address controlAdd;
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
-  
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
+    _;
+  }
+  bytes32 public constant CONTRACT_ROLE = keccak256("CONTRACT_ROLE");
+  modifier hasContractAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(CONTRACT_ROLE, msg.sender), "DOES NOT HAVE CONTRACT ROLE");
     _;
   }
   //*~~~> Memory array of all NFT contracts
@@ -102,13 +104,9 @@ contract ERC1155Factory {
     roleAdd = _role;
     return true;
   }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAdd = _contAdd;
-    return true;
-  }
 
   //*~~~> Function for deploying new ERC-721 contracts
-  function new1155Contract(address controller, address minter, string calldata tokenURI) hasAdmin public payable returns(bool) {
+  function new1155Contract(address controller, address minter, string calldata tokenURI) hasContractAdmin public payable returns(bool) {
     Pham1155 c = new Pham1155(controller, minter, tokenURI);
     _nftContractsCreated.increment();
     uint256 nftId = _nftContractsCreated.current();
@@ -138,10 +136,10 @@ contract ERC1155Factory {
   Fallback functions
   <~~~*/
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 }

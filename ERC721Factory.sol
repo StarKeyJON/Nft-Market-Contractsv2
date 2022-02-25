@@ -1,4 +1,3 @@
-//*~~~> SPDX-License-Identifier: MIT OR Apache-2.0
 /*~~~>
     Thank you Phunks, your inspiration and phriendship meant the world to me and helped me through hard times.
       Never stop phighting, never surrender, always stand up for what is right and make the best of all situations towards all people.
@@ -55,7 +54,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@@@@///////////////@@@@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
  <~~~*/
-pragma solidity ^0.8.3;
+pragma solidity  >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -71,16 +70,18 @@ contract ERC721Factory {
   //*~~~> counter increments 
   Counters.Counter private _nftContractsCreated;
 
-  //*~~~> Declaring object structures for NFTs and NFT contracts
+  //*~~~> Declaring object structures for NFT contracts
   struct NFTContract {
-      bool is1155;
-      uint itemId;
-      address creator;
+    bool is1155;
+    uint itemId;
+    address creator;
   }
 
   constructor(address _role){
     roleAdd = _role;
   }
+
+  address public roleAdd;
 
   //*~~~> Memory array of all NFT contracts created
   mapping (uint256 => NFTContract) private _idToNftContract;
@@ -88,23 +89,22 @@ contract ERC721Factory {
   /*~~~>
     Roles for designated accessibility
   <~~~*/
-  address roleAdd;
-  address controlAdd;
   bytes32 public constant PROXY_ROLE = keccak256("PROXY_ROLE"); 
-  
   modifier hasAdmin(){
     require(RoleProvider(roleAdd).hasTheRole(PROXY_ROLE, msg.sender), "DOES NOT HAVE ADMIN ROLE");
     _;
   }
+  bytes32 public constant CONTRACT_ROLE = keccak256("CONTRACT_ROLE");
+  modifier hasContractAdmin(){
+    require(RoleProvider(roleAdd).hasTheRole(CONTRACT_ROLE, msg.sender), "DOES NOT HAVE CONTRACT ROLE");
+    _;
+  }
   // *~~~> Events declared for listeners
+  //constructor(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol) 
   event nftContractCreated(address newAddress, uint nftId, address creator);
 
   function setRoleAdd(address _role) public hasAdmin returns(bool){
     roleAdd = _role;
-    return true;
-  }
-  function setControlAdd(address _contAdd) public hasAdmin returns(bool){
-    controlAdd = _contAdd;
     return true;
   }
 
@@ -116,9 +116,9 @@ contract ERC721Factory {
     address minter: minter role chosen byu the user;
     string calldata name: name of the contract;
     string calldata symbol: symbol of the token;
-  <~~~*/
-  function newNftContract(address controller, address minter, string calldata name, string calldata symbol) hasAdmin public payable returns(bool) {
-    PhamNFTs c = new PhamNFTs(controller, minter, name, symbol);
+  <~~~*/ 
+  function newNftContract(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol) hasContractAdmin public payable returns(bool) {
+    PhamNFTs c = new PhamNFTs(userOwnerAddress, controllerAddress, minterAddress, _price, _supply, tokenName, _tokenSymbol);
     _nftContractsCreated.increment();
     uint256 nftId = _nftContractsCreated.current();
     _idToNftContract[nftId] = NFTContract(false, nftId, msg.sender);
@@ -147,10 +147,10 @@ contract ERC721Factory {
   Fallback functions
   <~~~*/
   ///@notice
-  /*~~~> External ETH transfer forwarded to controller contract <~~~*/
+  /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
   receive() external payable {
-    payable(controlAdd).transfer(msg.value);
-      emit FundsForwarded(msg.value, msg.sender, controlAdd);
+    payable(roleAdd).transfer(msg.value);
+      emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
 }

@@ -86,11 +86,11 @@ contract RewardsControl is ReentrancyGuard, Pausable {
   address roleAdd;
 
   //*~~~> amount of ETH to split between Users;
-  uint userEth;
+  uint public userEth;
   //*~~~> amount of ETH to split between Devs;
-  uint devEth;
+  uint public devEth;
   //*~~~> amount of ETH to split between DAO;
-  uint daoEth;
+  uint public daoEth;
 
   //*~~~> Platform fee
   uint public fee;
@@ -548,11 +548,11 @@ contract RewardsControl is ReentrancyGuard, Pausable {
       // add received funds to devTokenAmount
       DevRewardToken memory devToken = idToDevToken[newTokenId];
       uint newDevAmnt = devToken.tokenAmount.add(devSplit);
-      idToDevToken[tokenId] = DevRewardToken(newTokenId, newDevAmnt, tokenAddress);
+      idToDevToken[newTokenId] = DevRewardToken(newTokenId, newDevAmnt, tokenAddress);
       // add received funds to daoTokenAmount
       DaoRewardToken memory daoToken = idToDaoToken[newTokenId];
       uint newDaoAmnt = daoToken.tokenAmount.add(daoSplit);
-      idToDaoToken[tokenId] = DaoRewardToken(newTokenId, newDaoAmnt, tokenAddress);
+      idToDaoToken[newTokenId] = DaoRewardToken(newTokenId, newDaoAmnt, tokenAddress);
     }
     emit Received(tokenAddress, amount); 
     return true;  

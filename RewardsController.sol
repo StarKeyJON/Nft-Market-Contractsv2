@@ -321,7 +321,7 @@ contract RewardsControl is ReentrancyGuard, Pausable {
 
   /*~~~> Public function anyone can call to split the accumulated user rewards
     When called, the current timestamp is saved as alpha time.
-    Old aplha time becomes delta,
+    Old alpha time becomes delta,
       old delta time becomes omega.
     Total user count is saved.
     Can only be called every 2 days.

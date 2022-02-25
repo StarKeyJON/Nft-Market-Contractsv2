@@ -235,6 +235,8 @@ contract MarketTrades is ReentrancyGuard, Pausable {
       address[] memory seller
   ) public whenNotPaused nonReentrant returns(bool){
     for (uint i;i<itemId.length;i++) {
+      address collsAdd = RoleProvider(roleAdd).fetchAddress(COLLECTION);
+      require(Collections(collsAdd).fetchCollection(nftContract[i]) == false);
       uint tradeId;
       if (openStorage.length>=1) {
         tradeId = openStorage[openStorage.length-1];

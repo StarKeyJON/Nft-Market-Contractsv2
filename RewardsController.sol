@@ -489,9 +489,8 @@ contract RewardsControl is ReentrancyGuard, Pausable {
     // userSplit is 2/3 of fee
     uint userSplit = partySplit.mul(2);
     // split dao in 4 parts, 
-    // 3/4 to dao, 
+    // 3/4 to dao, 1/4 to devs
     uint devSplit = partySplit.div(4);
-    // 1/4 to devs
     uint daoSplit = devSplit.mul(3);
     userEth = userEth.add(userSplit);
     daoEth = daoEth.add(daoSplit);
@@ -582,9 +581,8 @@ contract RewardsControl is ReentrancyGuard, Pausable {
       DaoRewardToken memory token = idToDaoToken[i+1];
       if (token.tokenAmount > 0) {
         IERC20(token.contractAddress).transfer(daoAdd, token.tokenAmount);
-        token = DaoRewardToken(token.tokenId, 0,token.contractAddress);
-        /// update new amount
-        token.tokenAmount = 0;
+         /// update new amount inline
+        idToDaoToken[token.tokenId] = DaoRewardToken(token.tokenId, 0, token.contractAddress);
       }
     }
   }

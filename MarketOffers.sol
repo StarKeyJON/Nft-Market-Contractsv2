@@ -1,4 +1,3 @@
-//*~~~> SPDX-License-Identifier: MIT OR Apache-2.0
 /*~~~>
     Thank you Phunks, your inspiration and phriendship meant the world to me and helped me through hard times.
       Never stop phighting, never surrender, always stand up for what is right and make the best of all situations towards all people.
@@ -388,11 +387,11 @@ contract MarketOffers is ReentrancyGuard, Pausable {
       IERC20 tokenContract = IERC20(offer.tokenCont);
       if(balance<1){
         /// Calculate fee and send to rewards contract
-        uint256 _fee = calcFee(offer.amount);
-        uint256 userAmnt = offer.amount.sub(_fee);
-        /// send (_fee) to rewards contract
-        Rewards(rewardsAdd).depositERC20Rewards(_fee, offer.tokenCont);
-         /// send (offerAmount - _fee) to user  
+        uint256 salefee = calcFee(offer.amount);
+        uint256 userAmnt = offer.amount.sub(salefee);
+        /// send (fsalefeeee) to rewards contract
+        Rewards(rewardsAdd).depositERC20Rewards(salefee, offer.tokenCont);
+         /// send (offerAmount - salefee) to user  
         (tokenContract).transfer(payable(msg.sender), userAmnt);
       } else {
         (tokenContract).transfer(payable(msg.sender), offer.amount);
@@ -439,9 +438,9 @@ contract MarketOffers is ReentrancyGuard, Pausable {
       IERC20 tokenContract = IERC20(offer.tokenCont);
       if(balance<1){
         /// Calculate fee and send to rewards contract
-        uint256 _fee = calcFee(offer.amount);
-        uint256 userAmnt = offer.amount.sub(_fee);
-        Rewards(rewardsAdd).depositERC20Rewards(_fee, offer.tokenCont);
+        uint256 fee = calcFee(offer.amount);
+        uint256 userAmnt = offer.amount.sub(fee);
+        Rewards(rewardsAdd).depositERC20Rewards(fee, offer.tokenCont);
         (tokenContract).transfer(payable(offer.seller), userAmnt);
       } else {
         (tokenContract).transfer(payable(offer.seller), offer.amount);

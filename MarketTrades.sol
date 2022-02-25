@@ -342,7 +342,7 @@ contract MarketTrades is ReentrancyGuard, Pausable {
       bool[] memory isBlind,
       uint[] memory itemId,
       uint[] memory tradeId
-  ) public whenPaused nonReentrant returns(bool){
+  ) public nonReentrant returns(bool){
     for (uint i; i<itemId.length; i++) {
       if(isBlind[i]){
       BlindTrade memory trade = idToBlindTrade[tradeId[i]];
@@ -562,7 +562,7 @@ contract MarketTrades is ReentrancyGuard, Pausable {
       tokenId: Id of the token to be transfered;
       to: address of recipient;
     <~~~*/
-  function transferFromERC721(address assetAddr, uint256 tokenId, address to) whenPaused internal virtual {
+  function transferFromERC721(address assetAddr, uint256 tokenId, address to) internal virtual {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;
@@ -596,7 +596,7 @@ contract MarketTrades is ReentrancyGuard, Pausable {
       to: address of recipient;
       tokenId: Id of the token to be transfered;
     <~~~*/
-  function approveERC721(address assetAddr, address to, uint256 tokenId) whenPaused internal virtual {
+  function approveERC721(address assetAddr, address to, uint256 tokenId) internal virtual {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;
@@ -626,7 +626,7 @@ contract MarketTrades is ReentrancyGuard, Pausable {
       to: address of the recipient;
       tokenId: Id of the token to be transfered;
     <~~~*/
-  function transferERC721(address assetAddr, address to, uint256 tokenId) whenPaused internal virtual {
+  function transferERC721(address assetAddr, address to, uint256 tokenId) internal virtual {
     address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
     address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
     bytes memory data;

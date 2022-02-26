@@ -61,8 +61,8 @@ contract ERC721AFactory {
     string calldata name: name of the contract;
     string calldata symbol: symbol of the token;
   <~~~*/ 
-  function newNftContract(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol) hasContractAdmin public payable returns(bool) {
-    PhamNFTs c = new Pham721A(userOwnerAddress, controllerAddress, minterAddress, _price, _supply, tokenName, _tokenSymbol);
+  function newNftContract(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol, , string memory _baseUri) hasContractAdmin public payable returns(bool) {
+    PhamNFTs c = new Pham721A(userOwnerAddress, controllerAddress, minterAddress, _price, _supply, tokenName, _tokenSymbol, _baseUri);
     _nftContractsCreated.increment();
     uint256 nftId = _nftContractsCreated.current();
     _idToNftContract[nftId] = NFTContract(false, nftId, msg.sender);

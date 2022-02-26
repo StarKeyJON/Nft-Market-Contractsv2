@@ -113,6 +113,7 @@ contract MarketCollections {
 
   //*~~~> Memory array of all listed Market Collections
   mapping(uint256 => MarketCollection) private idToCollection;
+  mapping(address => MarketCollection) private addressToCollection;
   mapping(address => TokenList) private addressToToken;
 
   //*~~~> Declaring event object structure for new collection added
@@ -202,12 +203,9 @@ contract MarketCollections {
   function fetchCollection(address nftContract) public view returns (bool) {
     uint collectionCount = _collectionsAdded.current();
     if(collectionCount <= 0) return false;
-    for (uint i; i < collectionCount; i++) {
-      if (idToCollection[i + 1].collectionContract == nftContract) {
-        if (idToCollection[i + 1].isNotTradable == true) {
-          return true;
-        }
-      }
+    MarketCollection memory collection = addressToCollection[nftContract];
+    if (collection.isNotTradable){
+      return true;
     }
     return false;
   }

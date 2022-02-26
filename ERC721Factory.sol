@@ -53,8 +53,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@@@@///////////////@@@@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@@@@///////////////@@@@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
- <~~~*/
-pragma solidity  >=0.8.0 <0.9.0;
+ <~~~*/pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -118,7 +117,7 @@ contract ERC721Factory {
     string calldata symbol: symbol of the token;
   <~~~*/ 
   function newNftContract(address userOwnerAddress, address controllerAddress, address minterAddress, uint256 _price, uint256 _supply, string memory tokenName, string memory _tokenSymbol) hasContractAdmin public payable returns(bool) {
-    PhamNFTs c = new PhamNFTs(userOwnerAddress, controllerAddress, minterAddress, _price, _supply, tokenName, _tokenSymbol);
+    PhamNFTs c = new Pham721(userOwnerAddress, controllerAddress, minterAddress, _price, _supply, tokenName, _tokenSymbol);
     _nftContractsCreated.increment();
     uint256 nftId = _nftContractsCreated.current();
     _idToNftContract[nftId] = NFTContract(false, nftId, msg.sender);
@@ -149,7 +148,7 @@ contract ERC721Factory {
   ///@notice
   /*~~~> External ETH transfer forwarded to role provider contract <~~~*/
   event FundsForwarded(uint value, address _from, address _to);
-  receive() external payable {
+  receive() external override payable {
     payable(roleAdd).transfer(msg.value);
       emit FundsForwarded(msg.value, msg.sender, roleAdd);
   }
